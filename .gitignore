@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+iana_mvp/data/uploads/*
+!iana_mvp/data/uploads/.gitkeep
+iana_mvp/data/results/*
+!iana_mvp/data/results/.gitkeep

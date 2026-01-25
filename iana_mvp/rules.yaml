@@ -1,0 +1,36 @@
+rules:
+  - id: R001
+    title: "Presencia de escala"
+    norm_ref: "N/A (pilot)"
+    severity: low
+    type: keyword_any
+    keywords: ["escala", "scale"]
+  - id: R002
+    title: "Presencia de norte"
+    norm_ref: "N/A (pilot)"
+    severity: low
+    type: keyword_any
+    keywords: ["norte", "north"]
+  - id: R003
+    title: "Cuadro de superficies"
+    norm_ref: "N/A (pilot)"
+    severity: med
+    type: keyword_any
+    keywords: ["cuadro de superficies", "superficie total", "m2", "m²"]
+  - id: R004
+    title: "Pendiente declarada (rampa/pendiente)"
+    norm_ref: "N/A (pilot)"
+    severity: med
+    type: regex
+    pattern: "(pendiente\\s*[:=]?\\s*)?(\\d{1,2}(\\.\\d+)?\\s*%|1\\s*:\\s*\\d+)"
+  - id: R005
+    title: "Accesibilidad (palabras clave)"
+    norm_ref: "N/A (pilot)"
+    severity: high
+    type: keyword_any
+    keywords: ["accesibilidad", "rampa", "pmr", "universal", "discap"]
+  - id: R006
+    title: "Ancho de puerta (patrones cerca de 'puerta')"
+    norm_ref: "N/A (pilot)"
+    severity: high
+    type: door_width
