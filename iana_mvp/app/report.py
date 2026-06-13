@@ -20,6 +20,7 @@ HTML_TMPL = Template(
     th { background: #f6f6f6; text-align: left; }
     .PASS { color: #1b5e20; font-weight: 700; }
     .FAIL { color: #b71c1c; font-weight: 700; }
+    .WARNING { color: #e65100; font-weight: 700; }
     .UNVERIFIABLE { color: #6d4c41; font-weight: 700; }
     .sev-high { font-weight: 700; }
     .evi { font-size: 12px; color:#333; }
@@ -43,12 +44,13 @@ HTML_TMPL = Template(
         <td class="{{ f.status }}">{{ f.status }}</td>
         <td>{{ "%.2f"|format(f.confidence) }}</td>
         <td class="evi">
+          {% if f.notes %}
+            <div style="font-style: italic; color: #555; margin-bottom: 6px;">{{ f.notes }}</div>
+          {% endif %}
           {% if f.evidence and f.evidence|length > 0 %}
             {% for e in f.evidence %}
-              <div>p. {{ e.page }} — {{ e.snippet }}</div>
+              <div style="margin-top: 4px; border-top: 1px dashed #eee; padding-top: 4px;">p. {{ e.page }} — {{ e.snippet }}</div>
             {% endfor %}
-          {% else %}
-            {{ f.notes }}
           {% endif %}
         </td>
       </tr>

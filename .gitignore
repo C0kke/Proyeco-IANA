@@ -1,11 +1,35 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache and temporary files
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment variables
 .env
+
+# Project specific data directories
 iana_mvp/data/uploads/*
 !iana_mvp/data/uploads/.gitkeep
 iana_mvp/data/results/*
 !iana_mvp/data/results/.gitkeep
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary and script files
 branch_structure.json
 temp_auto_push.bat
 temp_interactive_push.bat
-.gitignore
+*.log

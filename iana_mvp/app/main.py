@@ -88,3 +88,4 @@ def report(job_id: str) -> HTMLResponse:
         return HTMLResponse("<h1>Not found</h1>", status_code=404)
     with open(path, "r", encoding="utf-8") as handle:
         return HTMLResponse(handle.read())
+
