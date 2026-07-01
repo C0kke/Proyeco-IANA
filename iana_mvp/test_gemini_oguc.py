@@ -1,7 +1,6 @@
 import os
 import sys
 
-# Asegurar que el directorio actual está en sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.ai_verifier import evaluate_project_with_ai
@@ -9,7 +8,6 @@ from app.ai_verifier import evaluate_project_with_ai
 def main():
     print("--- Probando Verificación Normativa con Gemini e Instructor ---")
     
-    # 1. Cargar archivo OGUC
     oguc_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "knowledge", "OGUC_2026.md")
     if not os.path.exists(oguc_path):
         print(f"Error: No se encontró la OGUC en {oguc_path}")
@@ -17,10 +15,8 @@ def main():
         
     print("Cargando OGUC para la prueba...")
     with open(oguc_path, "r", encoding="utf-8") as f:
-        # Cargamos una muestra de la OGUC para agilizar la prueba (primeros 250k caracteres)
         oguc_text = f.read()[:250000]
         
-    # 2. Mockup de texto de plano con fallos normativos chilenos evidentes
     plan_mock = (
         "PROYECTO: Edificio Residencial Los Andes\n"
         "PLANO DE ACCESO Y DISTRIBUCIÓN PISO 1\n"
@@ -35,7 +31,6 @@ def main():
     print(plan_mock)
     print("-" * 40)
     
-    # 3. Evaluar
     print("\nEnviando petición a la API de Gemini... (esto puede tardar unos segundos)")
     try:
         result = evaluate_project_with_ai(plan_mock, oguc_text)

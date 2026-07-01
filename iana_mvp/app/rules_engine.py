@@ -28,7 +28,6 @@ def run_rules(blocks, rules: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             for b in blocks:
                 matched = False
                 for kw in kws:
-                    # Coincidir con la palabra clave solo al inicio de una palabra (evita falsos positivos como "scale" en "fiscales")
                     pattern = re.compile(rf"(?:^|[^a-zñáéíóúü]){re.escape(kw)}", re.IGNORECASE)
                     if pattern.search(b.text_norm):
                         matched = True
@@ -48,7 +47,6 @@ def run_rules(blocks, rules: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 if "puerta" in b.text_norm and width_re.search(b.text):
                     matches.append({"page": b.page, "bbox": b.bbox, "snippet": b.text[:200]})
 
-        # Calcular métricas dinámicas
         num_matches = len(matches)
         unique_pages = len(set(m["page"] for m in matches)) if num_matches > 0 else 0
 
@@ -74,7 +72,7 @@ def run_rules(blocks, rules: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             elif num_matches == 1:
                 status = "WARNING"
                 confidence = 0.75
-                notes = f"Se encontró un único patrón coincidente en la página {matches[0]['page']}. Validar precisión."
+                notes = f"Se encontró un único patrón coinciciente en la página {matches[0]['page']}. Validar precisión."
             else:
                 status = "PASS"
                 confidence = min(0.80 + (unique_pages * 0.03) + (num_matches * 0.01), 0.95)

@@ -23,7 +23,7 @@ class TextBlock:
     text_norm: str
 
 
-def extract_text_blocks(pdf_path: str) -> List[TextBlock]:
+def extract_pdf_blocks(pdf_path: str) -> List[TextBlock]:
     doc = fitz.open(pdf_path)
     blocks: List[TextBlock] = []
     for i, page in enumerate(doc):
@@ -38,3 +38,39 @@ def extract_text_blocks(pdf_path: str) -> List[TextBlock]:
             )
     doc.close()
     return blocks
+
+def extract_docx_blocks(docx_path: str) -> List[TextBlock]:
+    import docx
+    doc = docx.Document(docx_path)
+    blocks: List[TextBlock] = []
+    
+    for i, para in enumerate(doc.paragraphs):
+        txt = para.text.strip()
+        if not txt:
+            continue
+        tnorm = normalize_text(txt)
+        blocks.append(
+            TextBlock(page=1, bbox=[0, 0, 0, 0], text=txt, text_norm=tnorm)
+        )
+        
+    for table in doc.tables:
+        for row in table.rows:
+            row_cells = []
+            for cell in row.cells:
+                txt = cell.text.strip()
+                if not row_cells or row_cells[-1] != txt:
+                    row_cells.append(txt)
+            row_txt = " | ".join([t for t in row_cells if t])
+            if row_txt:
+                tnorm = normalize_text(row_txt)
+                blocks.append(
+                    TextBlock(page=1, bbox=[0, 0, 0, 0], text=row_txt, text_norm=tnorm)
+                )
+    return blocks
+
+
+def extract_text_blocks(file_path: str) -> List[TextBlock]:
+    if file_path.lower().endswith(".docx"):
+        return extract_docx_blocks(file_path)
+    else:
+        return extract_pdf_blocks(file_path)
