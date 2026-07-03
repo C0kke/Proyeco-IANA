@@ -8,6 +8,7 @@ from fastapi import FastAPI, File, UploadFile, Response, Depends, Header, HTTPEx
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
+from typing import Optional
 
 from .pdf_extract import extract_text_blocks
 from .report import render_html_report
@@ -280,26 +281,41 @@ async def upload_pdf(
     return JSONResponse({"job_id": job_id})
 
 
+def get_job_if_authorized(job_id: str, user_id: str) -> Optional[dict]:
+    path = os.path.join(RESULTS, f"{job_id}.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if data.get("user_id") == user_id:
+            return data
+    except (OSError, ValueError) as err:
+        print(f"Error checking ownership for job {job_id}: {err}")
+    return None
+
 @app.get("/api/status/{job_id}")
 def status(job_id: str, current_user: dict = Depends(get_current_user)) -> JSONResponse:
-    ok = os.path.exists(os.path.join(RESULTS, f"{job_id}.json"))
-    return JSONResponse({"job_id": job_id, "status": "DONE" if ok else "NOT_FOUND"})
+    job_data = get_job_if_authorized(job_id, current_user["user"].id)
+    return JSONResponse({"job_id": job_id, "status": "DONE" if job_data else "NOT_FOUND"})
 
 
 @app.get("/api/result/{job_id}")
 def result(job_id: str, current_user: dict = Depends(get_current_user)) -> JSONResponse:
-    path = os.path.join(RESULTS, f"{job_id}.json")
-    if not os.path.exists(path):
-        return JSONResponse({"error": "not_found"}, status_code=404)
-    with open(path, "r", encoding="utf-8") as handle:
-        return JSONResponse(json.load(handle))
+    job_data = get_job_if_authorized(job_id, current_user["user"].id)
+    if not job_data:
+        return JSONResponse({"error": "No se encontró el reporte o no tienes acceso."}, status_code=404)
+    return JSONResponse(job_data)
 
 
 @app.get("/api/report/{job_id}", response_class=HTMLResponse)
 def report(job_id: str, current_user: dict = Depends(get_current_user)) -> HTMLResponse:
+    job_data = get_job_if_authorized(job_id, current_user["user"].id)
+    if not job_data:
+        return HTMLResponse("<h1>No se encontró el reporte o no tienes acceso</h1>", status_code=404)
     path = os.path.join(RESULTS, f"{job_id}.html")
     if not os.path.exists(path):
-        return HTMLResponse("<h1>Not found</h1>", status_code=404)
+        return HTMLResponse("<h1>Reporte HTML no encontrado</h1>", status_code=404)
     with open(path, "r", encoding="utf-8") as handle:
         return HTMLResponse(handle.read())
 
@@ -327,39 +343,40 @@ def list_jobs(page: int = 1, page_size: int = 10, current_user: dict = Depends(g
         if f.endswith(".json")
     ]
     
-    file_info = []
+    authorized_jobs = []
+    user_id = current_user["user"].id
     for f in files:
         path = os.path.join(RESULTS, f)
-        mtime = os.path.getmtime(path)
-        file_info.append((path, mtime))
-        
-    file_info.sort(key=lambda x: x[1], reverse=True)
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            if data.get("user_id") == user_id:
+                mtime = os.path.getmtime(path)
+                authorized_jobs.append((data, mtime))
+        except (OSError, ValueError) as err:
+            print(f"Error reading result file {path}: {err}")
+            
+    authorized_jobs.sort(key=lambda x: x[1], reverse=True)
     
-    total_jobs = len(file_info)
+    total_jobs = len(authorized_jobs)
     total_pages = (total_jobs + page_size - 1) // page_size if total_jobs > 0 else 0
     
     start_idx = (page - 1) * page_size
     end_idx = start_idx + page_size
-    page_slice = file_info[start_idx:end_idx]
+    page_slice = authorized_jobs[start_idx:end_idx]
     
     jobs = []
-    for path, mtime in page_slice:
-        try:
-            with open(path, "r", encoding="utf-8") as handle:
-                data = json.load(handle)
-                
-            dt = datetime.fromtimestamp(mtime)
-            jobs.append({
-                "job_id": data.get("job_id"),
-                "filename": data.get("filename"),
-                "project_name": data.get("project_name"),
-                "success_probability": data.get("success_probability"),
-                "created_at": dt.isoformat(),
-                "summary_notes_short": data.get("summary_notes", "")[:200] + "..." if len(data.get("summary_notes", "")) > 200 else data.get("summary_notes", ""),
-                "infractions_count": len(data.get("infractions", []))
-            })
-        except Exception as e:
-            print(f"Error leyendo archivo de resultado {path}: {e}")
+    for data, mtime in page_slice:
+        dt = datetime.fromtimestamp(mtime)
+        jobs.append({
+            "job_id": data.get("job_id"),
+            "filename": data.get("filename"),
+            "project_name": data.get("project_name"),
+            "success_probability": data.get("success_probability"),
+            "created_at": dt.isoformat(),
+            "summary_notes_short": data.get("summary_notes", "")[:200] + "..." if len(data.get("summary_notes", "")) > 200 else data.get("summary_notes", ""),
+            "infractions_count": len(data.get("infractions", []))
+        })
             
     return JSONResponse({
         "total_jobs": total_jobs,
@@ -372,16 +389,15 @@ def list_jobs(page: int = 1, page_size: int = 10, current_user: dict = Depends(g
 
 @app.get("/api/report/{job_id}/pdf")
 def report_pdf(job_id: str, current_user: dict = Depends(get_current_user)) -> Response:
+    job_data = get_job_if_authorized(job_id, current_user["user"].id)
+    if not job_data:
+        return Response("No se encontró el reporte o no tienes acceso", status_code=404, media_type="text/plain")
+        
     path = os.path.join(RESULTS, f"{job_id}.pdf")
     if not os.path.exists(path):
-        path_json = os.path.join(RESULTS, f"{job_id}.json")
-        if not os.path.exists(path_json):
-            return Response("Not found", status_code=404, media_type="text/plain")
         try:
-            with open(path_json, "r", encoding="utf-8") as handle:
-                result_data = json.load(handle)
             from .report import render_pdf_report
-            pdf_bytes = render_pdf_report(result_data["filename"], result_data)
+            pdf_bytes = render_pdf_report(job_data["filename"], job_data)
             with open(path, "wb") as handle:
                 handle.write(pdf_bytes)
         except Exception as e:
@@ -397,14 +413,14 @@ def report_pdf(job_id: str, current_user: dict = Depends(get_current_user)) -> R
 
 class ProjectCreateRequest(BaseModel):
     name: str
-    project_type: str = "real_estate"
+    project_type: str = "private_housing"
     region: str
     commune: str
-    latitude: float = None
-    longitude: float = None
-    terrain_rol: str = ""
-    block: str = ""
-    lot: str = ""
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    terrain_rol: Optional[str] = None
+    block: Optional[str] = None
+    lot: Optional[str] = None
 
 @app.post("/api/projects")
 def api_create_project(req: ProjectCreateRequest, current_user: dict = Depends(get_current_user)):
