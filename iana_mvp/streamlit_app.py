@@ -586,7 +586,7 @@ def render_edit_project_modal():
             lat_val = p_lat
             lng_val = p_lng
             if (p_commune != p["commune"] or p_region != p["region"]) and (p_lat == p["latitude"] and p_lng == p["longitude"]):
-                calc_lat, calc_lng = get_commune_coordinates(p_commune, p_region)
+                calc_lat, calc_lng = get_commune_coordinates(p_region, p_commune)
                 lat_val = calc_lat
                 lng_val = calc_lng
                 
