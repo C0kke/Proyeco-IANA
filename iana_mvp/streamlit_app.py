@@ -4,9 +4,9 @@ import uuid
 import json
 from datetime import datetime
 
+from app.version import __version__
 from app.pdf_extract import extract_text_blocks
 from app.ai_verifier import (
-    evaluate_project_with_ai,
     evaluate_document_individually,
     consolidate_project_context
 )
@@ -25,8 +25,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FAVICON_PATH = os.path.join(os.path.dirname(BASE_DIR), "public", "favicon.ico")
 
 st.set_page_config(
-    page_title="IANA - Validador de Proyectos (OGUC)",
-    page_icon=FAVICON_PATH,
+    page_title=f"IANA v{__version__} - Validador de Proyectos (OGUC)",
+    page_icon=FAVICON_PATH if os.path.exists(FAVICON_PATH) else "🏢",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -128,7 +128,7 @@ if not OGUC_CONTENT:
     st.error("Error crítico: No se pudo cargar el archivo normativo OGUC_2026.md.")
 
 def render_auth_page():
-    st.title("IANA v0.1 — Validador Normativo de Proyectos")
+    st.title(f"IANA v{__version__} — Validador Normativo de Proyectos")
     st.markdown("Verifica planos y especificaciones técnicas contra la **Ordenanza General de Urbanismo y Construcción (OGUC) de Chile** utilizando Inteligencia Artificial.")
     
     col1, col2 = st.columns([1, 1])

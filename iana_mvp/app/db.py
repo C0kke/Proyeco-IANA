@@ -20,7 +20,10 @@ def get_supabase_client(jwt_token: Optional[str] = None) -> Client:
     if jwt_token:
         client = create_client(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
         client.postgrest.auth(jwt_token)
-        client.storage.headers.update({"Authorization": f"Bearer {jwt_token}"})
+        if hasattr(client.storage, "_headers"):
+            client.storage._headers.update({"Authorization": f"Bearer {jwt_token}"})
+        if hasattr(client.storage, "_client") and hasattr(client.storage._client, "headers"):
+            client.storage._client.headers.update({"Authorization": f"Bearer {jwt_token}"})
         return client
     else:
         return create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
@@ -103,7 +106,13 @@ def upload_project_document(
     jwt_token: str
 ) -> Dict[str, Any]:
     bucket_name = "project-documents"
-    bucket_path = f"{user_id}/{project_id}/{document_type}/{file_name}"
+    
+    safe_filename = os.path.basename(file_name)
+    if not safe_filename or safe_filename in [".", ".."]:
+        import uuid
+        safe_filename = f"documento_{uuid.uuid4().hex[:8]}.pdf"
+        
+    bucket_path = f"{user_id}/{project_id}/{document_type}/{safe_filename}"
     user_client = get_supabase_client(jwt_token)
     
     try:
@@ -114,13 +123,13 @@ def upload_project_document(
         )
         doc_record = {
             "project_id": project_id,
-            "file_name": file_name,
+            "file_name": safe_filename,
             "document_type": document_type,
             "bucket_path": bucket_path
         }
         db_res = user_client.table("documents").insert(doc_record).execute()
         
-        logger.info(f"Documento '{file_name}' guardado exitosamente en Supabase (Bucket + DB).")
+        logger.info(f"Documento '{safe_filename}' guardado exitosamente en Supabase (Bucket + DB).")
         return {
             "success": True,
             "storage_location": "supabase",
@@ -131,9 +140,19 @@ def upload_project_document(
     except Exception as e:
         logger.critical(
             f"ALERTA DESARROLLO - FALLO EN STORAGE SUPABASE: "
-            f"No se pudo guardar el archivo '{file_name}' en el bucket '{bucket_name}' para el proyecto '{project_id}'. "
+            f"No se pudo guardar el archivo '{safe_filename}' en el bucket '{bucket_name}' para el proyecto '{project_id}'. "
             f"Detalle del error: {str(e)}"
         )
+        
+        try:
+            proj_check = user_client.table("projects").select("id").eq("id", project_id).execute()
+            if not proj_check.data:
+                logger.error(f"Intento de acceso no autorizado detectado en fallback para el proyecto {project_id}")
+                return {"success": False, "error": "Acceso denegado al proyecto o proyecto no encontrado."}
+        except Exception as check_err:
+            logger.error(f"Error comprobando propiedad del proyecto en fallback: {check_err}")
+            return {"success": False, "error": "No se pudo verificar el acceso al proyecto."}
+
         try:
             local_fallback_dir = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
@@ -142,17 +161,17 @@ def upload_project_document(
                 "fallback"
             )
             os.makedirs(local_fallback_dir, exist_ok=True)
-            local_file_path = os.path.join(local_fallback_dir, f"{project_id}_{file_name}")
+            local_file_path = os.path.join(local_fallback_dir, f"{project_id}_{safe_filename}")
             
             with open(local_file_path, "wb") as handle:
                 handle.write(file_bytes)
                 
-            local_rel_path = f"local://fallback/{project_id}_{file_name}"
+            local_rel_path = f"local://fallback/{project_id}_{safe_filename}"
             logger.warning(f"Fallback activado: Archivo guardado localmente en: {local_file_path}")
             
             fallback_record = {
                 "project_id": project_id,
-                "file_name": file_name,
+                "file_name": safe_filename,
                 "document_type": document_type,
                 "bucket_path": local_rel_path
             }

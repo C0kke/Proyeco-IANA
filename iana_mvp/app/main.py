@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from typing import Dict, Optional
 
 from fastapi import FastAPI, File, UploadFile, Response, Depends, Header, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +28,7 @@ from .db import (
     update_project_context_db,
     get_supabase_client
 )
+from .version import __version__
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -36,7 +38,11 @@ RESULTS = os.path.join(DATA_DIR, "results")
 os.makedirs(UPLOADS, exist_ok=True)
 os.makedirs(RESULTS, exist_ok=True)
 
-app = FastAPI(title="IANA v0.1 MVP - OGUC Validador")
+app = FastAPI(title="IANA MVP - OGUC Validador", version=__version__)
+
+@app.get("/api/version")
+def get_api_version() -> Dict[str, str]:
+    return {"version": __version__}
 
 app.add_middleware(
     CORSMiddleware,
@@ -169,6 +175,12 @@ async def upload_pdf(
     blocks = extract_text_blocks(file_path)
     plan_text = "\n".join([b.text for b in blocks])
 
+    if not plan_text.strip():
+        return JSONResponse(
+            {"error": "El archivo subido no contiene texto legible (sin capa de texto OCR)."},
+            status_code=400
+        )
+
     eval_dict = None
     if project_id:
         try:
@@ -253,6 +265,7 @@ async def upload_pdf(
 
     result = {
         "job_id": job_id,
+        "user_id": current_user["user"].id,
         "filename": file.filename,
         "project_name": eval_dict.get("project_name", file.filename),
         "success_probability": eval_dict.get("success_probability", 0.0),
@@ -279,30 +292,41 @@ async def upload_pdf(
 
     return JSONResponse({"job_id": job_id})
 
+def get_job_if_authorized(job_id: str, user_id: str) -> Optional[dict]:
+    path = os.path.join(RESULTS, f"{job_id}.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if data.get("user_id") == user_id:
+            return data
+    except Exception as e:
+        print(f"Error checking ownership for job {job_id}: {e}")
+    return None
 
 @app.get("/api/status/{job_id}")
 def status(job_id: str, current_user: dict = Depends(get_current_user)) -> JSONResponse:
-    ok = os.path.exists(os.path.join(RESULTS, f"{job_id}.json"))
-    return JSONResponse({"job_id": job_id, "status": "DONE" if ok else "NOT_FOUND"})
-
+    job_data = get_job_if_authorized(job_id, current_user["user"].id)
+    return JSONResponse({"job_id": job_id, "status": "DONE" if job_data else "NOT_FOUND"})
 
 @app.get("/api/result/{job_id}")
 def result(job_id: str, current_user: dict = Depends(get_current_user)) -> JSONResponse:
-    path = os.path.join(RESULTS, f"{job_id}.json")
-    if not os.path.exists(path):
-        return JSONResponse({"error": "not_found"}, status_code=404)
-    with open(path, "r", encoding="utf-8") as handle:
-        return JSONResponse(json.load(handle))
-
+    job_data = get_job_if_authorized(job_id, current_user["user"].id)
+    if not job_data:
+        return JSONResponse({"error": "No se encontró el reporte o no tienes acceso."}, status_code=404)
+    return JSONResponse(job_data)
 
 @app.get("/api/report/{job_id}", response_class=HTMLResponse)
 def report(job_id: str, current_user: dict = Depends(get_current_user)) -> HTMLResponse:
+    job_data = get_job_if_authorized(job_id, current_user["user"].id)
+    if not job_data:
+        return HTMLResponse("<h1>No se encontró el reporte o no tienes acceso</h1>", status_code=404)
     path = os.path.join(RESULTS, f"{job_id}.html")
     if not os.path.exists(path):
-        return HTMLResponse("<h1>Not found</h1>", status_code=404)
+        return HTMLResponse("<h1>Reporte HTML no encontrado</h1>", status_code=404)
     with open(path, "r", encoding="utf-8") as handle:
         return HTMLResponse(handle.read())
-
 
 @app.get("/api/jobs")
 def list_jobs(page: int = 1, page_size: int = 10, current_user: dict = Depends(get_current_user)) -> JSONResponse:
@@ -327,39 +351,40 @@ def list_jobs(page: int = 1, page_size: int = 10, current_user: dict = Depends(g
         if f.endswith(".json")
     ]
     
-    file_info = []
+    authorized_jobs = []
+    user_id = current_user["user"].id
     for f in files:
         path = os.path.join(RESULTS, f)
-        mtime = os.path.getmtime(path)
-        file_info.append((path, mtime))
-        
-    file_info.sort(key=lambda x: x[1], reverse=True)
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            if data.get("user_id") == user_id:
+                mtime = os.path.getmtime(path)
+                authorized_jobs.append((data, mtime))
+        except Exception:
+            pass
+            
+    authorized_jobs.sort(key=lambda x: x[1], reverse=True)
     
-    total_jobs = len(file_info)
+    total_jobs = len(authorized_jobs)
     total_pages = (total_jobs + page_size - 1) // page_size if total_jobs > 0 else 0
     
     start_idx = (page - 1) * page_size
     end_idx = start_idx + page_size
-    page_slice = file_info[start_idx:end_idx]
+    page_slice = authorized_jobs[start_idx:end_idx]
     
     jobs = []
-    for path, mtime in page_slice:
-        try:
-            with open(path, "r", encoding="utf-8") as handle:
-                data = json.load(handle)
-                
-            dt = datetime.fromtimestamp(mtime)
-            jobs.append({
-                "job_id": data.get("job_id"),
-                "filename": data.get("filename"),
-                "project_name": data.get("project_name"),
-                "success_probability": data.get("success_probability"),
-                "created_at": dt.isoformat(),
-                "summary_notes_short": data.get("summary_notes", "")[:200] + "..." if len(data.get("summary_notes", "")) > 200 else data.get("summary_notes", ""),
-                "infractions_count": len(data.get("infractions", []))
-            })
-        except Exception as e:
-            print(f"Error leyendo archivo de resultado {path}: {e}")
+    for data, mtime in page_slice:
+        dt = datetime.fromtimestamp(mtime)
+        jobs.append({
+            "job_id": data.get("job_id"),
+            "filename": data.get("filename"),
+            "project_name": data.get("project_name"),
+            "success_probability": data.get("success_probability"),
+            "created_at": dt.isoformat(),
+            "summary_notes_short": data.get("summary_notes", "")[:200] + "..." if len(data.get("summary_notes", "")) > 200 else data.get("summary_notes", ""),
+            "infractions_count": len(data.get("infractions", []))
+        })
             
     return JSONResponse({
         "total_jobs": total_jobs,
@@ -372,16 +397,15 @@ def list_jobs(page: int = 1, page_size: int = 10, current_user: dict = Depends(g
 
 @app.get("/api/report/{job_id}/pdf")
 def report_pdf(job_id: str, current_user: dict = Depends(get_current_user)) -> Response:
+    job_data = get_job_if_authorized(job_id, current_user["user"].id)
+    if not job_data:
+        return Response("No se encontró el reporte o no tienes acceso", status_code=404, media_type="text/plain")
+        
     path = os.path.join(RESULTS, f"{job_id}.pdf")
     if not os.path.exists(path):
-        path_json = os.path.join(RESULTS, f"{job_id}.json")
-        if not os.path.exists(path_json):
-            return Response("Not found", status_code=404, media_type="text/plain")
         try:
-            with open(path_json, "r", encoding="utf-8") as handle:
-                result_data = json.load(handle)
             from .report import render_pdf_report
-            pdf_bytes = render_pdf_report(result_data["filename"], result_data)
+            pdf_bytes = render_pdf_report(job_data["filename"], job_data)
             with open(path, "wb") as handle:
                 handle.write(pdf_bytes)
         except Exception as e:
@@ -397,7 +421,7 @@ def report_pdf(job_id: str, current_user: dict = Depends(get_current_user)) -> R
 
 class ProjectCreateRequest(BaseModel):
     name: str
-    project_type: str = "real_estate"
+    project_type: str = "private_housing"
     region: str
     commune: str
     latitude: float = None

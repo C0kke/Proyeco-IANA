@@ -63,7 +63,7 @@ class DocumentSpecificAnalysis(BaseModel):
         description="Lista de infracciones o incumplimientos de la OGUC encontrados *únicamente* en este archivo. Si no hay, debe ser []"
     )
     extracted_metadata: Dict[str, str] = Field(
-        default={},
+        default_factory=dict,
         description="Diccionario de parámetros clave-valor importantes extraídos (ej. 'rol_terreno', 'superficie', 'altura_maxima', 'manzana', 'lote', 'comuna', 'region', 'destino_edificacion')."
     )
 

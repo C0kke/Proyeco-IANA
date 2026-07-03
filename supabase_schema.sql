@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
-    rut VARCHAR(20) UNIQUE NOT NULL,
+    rut VARCHAR(20) UNIQUE,
     role public.user_role NOT NULL DEFAULT 'architect',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -109,13 +109,17 @@ BEGIN
         new.id,
         new.email,
         coalesce(new.raw_user_meta_data->>'name', ''),
-        coalesce(new.raw_user_meta_data->>'phone', ''),
-        coalesce(new.raw_user_meta_data->>'rut', ''),
-        coalesce((new.raw_user_meta_data->>'role')::public.user_role, 'architect'::public.user_role)
+        new.raw_user_meta_data->>'phone',
+        nullif(new.raw_user_meta_data->>'rut', ''),
+        CASE 
+            WHEN new.raw_user_meta_data->>'role' IN ('architect', 'independent_developer', 'engineering', 'public_admin', 'other') 
+            THEN (new.raw_user_meta_data->>'role')::public.user_role 
+            ELSE 'architect'::public.user_role 
+        END
     );
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -134,7 +138,7 @@ CREATE POLICY "Users can view their own profile"
 
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.users;
 CREATE POLICY "Users can update their own profile"
-    ON public.users FOR UPDATE TO authenticated USING (auth.uid() = id);
+    ON public.users FOR UPDATE TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
 DROP POLICY IF EXISTS "Users can view their own projects" ON public.projects;
 CREATE POLICY "Users can view their own projects"
@@ -146,7 +150,7 @@ CREATE POLICY "Users can create their own projects"
 
 DROP POLICY IF EXISTS "Users can update their own projects" ON public.projects;
 CREATE POLICY "Users can update their own projects"
-    ON public.projects FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+    ON public.projects FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own projects" ON public.projects;
 CREATE POLICY "Users can delete their own projects"
