@@ -316,7 +316,7 @@ def get_document_file_bytes(doc: dict, jwt_token: str) -> bytes | None:
         return None
         
     if bucket_path.startswith("local://fallback/"):
-        filename = bucket_path.replace("local://fallback/", "")
+        filename = os.path.basename(bucket_path.replace("local://fallback/", ""))
         local_path = os.path.join(DATA_DIR, "uploads", "fallback", filename)
         if os.path.exists(local_path):
             try:
