@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from typing import Dict, Optional
 
 from fastapi import FastAPI, File, UploadFile, Response, Depends, Header, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,6 +29,7 @@ from .db import (
     update_project_context_db,
     get_supabase_client
 )
+from .version import __version__
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -37,7 +39,11 @@ RESULTS = os.path.join(DATA_DIR, "results")
 os.makedirs(UPLOADS, exist_ok=True)
 os.makedirs(RESULTS, exist_ok=True)
 
-app = FastAPI(title="IANA v0.1 MVP - OGUC Validador")
+app = FastAPI(title="IANA MVP - OGUC Validador", version=__version__)
+
+@app.get("/api/version")
+def get_api_version() -> Dict[str, str]:
+    return {"version": __version__}
 
 app.add_middleware(
     CORSMiddleware,
@@ -170,6 +176,12 @@ async def upload_pdf(
     blocks = extract_text_blocks(file_path)
     plan_text = "\n".join([b.text for b in blocks])
 
+    if not plan_text.strip():
+        return JSONResponse(
+            {"error": "El archivo subido no contiene texto legible (sin capa de texto OCR)."},
+            status_code=400
+        )
+
     eval_dict = None
     if project_id:
         try:
@@ -254,6 +266,7 @@ async def upload_pdf(
 
     result = {
         "job_id": job_id,
+        "user_id": current_user["user"].id,
         "filename": file.filename,
         "project_name": eval_dict.get("project_name", file.filename),
         "success_probability": eval_dict.get("success_probability", 0.0),
@@ -280,6 +293,18 @@ async def upload_pdf(
 
     return JSONResponse({"job_id": job_id})
 
+def get_job_if_authorized(job_id: str, user_id: str) -> Optional[dict]:
+    path = os.path.join(RESULTS, f"{job_id}.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if data.get("user_id") == user_id:
+            return data
+    except Exception as e:
+        print(f"Error checking ownership for job {job_id}: {e}")
+    return None
 
 def get_job_if_authorized(job_id: str, user_id: str) -> Optional[dict]:
     path = os.path.join(RESULTS, f"{job_id}.json")
@@ -299,14 +324,12 @@ def status(job_id: str, current_user: dict = Depends(get_current_user)) -> JSONR
     job_data = get_job_if_authorized(job_id, current_user["user"].id)
     return JSONResponse({"job_id": job_id, "status": "DONE" if job_data else "NOT_FOUND"})
 
-
 @app.get("/api/result/{job_id}")
 def result(job_id: str, current_user: dict = Depends(get_current_user)) -> JSONResponse:
     job_data = get_job_if_authorized(job_id, current_user["user"].id)
     if not job_data:
         return JSONResponse({"error": "No se encontró el reporte o no tienes acceso."}, status_code=404)
     return JSONResponse(job_data)
-
 
 @app.get("/api/report/{job_id}", response_class=HTMLResponse)
 def report(job_id: str, current_user: dict = Depends(get_current_user)) -> HTMLResponse:
@@ -318,7 +341,6 @@ def report(job_id: str, current_user: dict = Depends(get_current_user)) -> HTMLR
         return HTMLResponse("<h1>Reporte HTML no encontrado</h1>", status_code=404)
     with open(path, "r", encoding="utf-8") as handle:
         return HTMLResponse(handle.read())
-
 
 @app.get("/api/jobs")
 def list_jobs(page: int = 1, page_size: int = 10, current_user: dict = Depends(get_current_user)) -> JSONResponse:

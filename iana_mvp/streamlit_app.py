@@ -313,7 +313,7 @@ def get_document_file_bytes(doc: dict, jwt_token: str) -> bytes | None:
         return None
         
     if bucket_path.startswith("local://fallback/"):
-        filename = bucket_path.replace("local://fallback/", "")
+        filename = os.path.basename(bucket_path.replace("local://fallback/", ""))
         local_path = os.path.join(DATA_DIR, "uploads", "fallback", filename)
         if os.path.exists(local_path):
             try:
@@ -583,7 +583,7 @@ def render_edit_project_modal():
             lat_val = p_lat
             lng_val = p_lng
             if (p_commune != p["commune"] or p_region != p["region"]) and (p_lat == p["latitude"] and p_lng == p["longitude"]):
-                calc_lat, calc_lng = get_commune_coordinates(p_commune, p_region)
+                calc_lat, calc_lng = get_commune_coordinates(p_region, p_commune)
                 lat_val = calc_lat
                 lng_val = calc_lng
                 
