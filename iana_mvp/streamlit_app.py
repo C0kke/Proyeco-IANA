@@ -2,7 +2,6 @@ import streamlit as st
 import os
 import uuid
 import json
-import urllib.request
 import urllib.parse
 from datetime import datetime
 
@@ -81,7 +80,11 @@ if "chile_tz" not in st.session_state:
 def set_session_cookie(token: str):
     js = f"""
     <script>
-    parent.document.cookie = "session_token={token}; path=/; max-age=2592000; SameSite=Lax";
+    let cookieStr = "session_token={token}; path=/; max-age=2592000; SameSite=Lax";
+    if (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {{
+        cookieStr += "; Secure";
+    }}
+    parent.document.cookie = cookieStr;
     </script>
     """
     st.components.v1.html(js, height=0, width=0)
@@ -89,7 +92,11 @@ def set_session_cookie(token: str):
 def clear_session_cookie():
     js = """
     <script>
-    parent.document.cookie = "session_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+    let cookieStr = "session_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
+    if (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        cookieStr += "; Secure";
+    }
+    parent.document.cookie = cookieStr;
     </script>
     """
     st.components.v1.html(js, height=0, width=0)
@@ -280,31 +287,21 @@ def get_commune_coordinates(region_name: str, commune_name: str) -> tuple[float,
         print(f"Error al leer regiones.json para coordenadas: {e}")
 
     try:
+        import httpx
         query = f"{commune_name}, {region_name}, Chile"
         url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(query)}&format=json&limit=1"
         headers = {"User-Agent": f"IANA-App/{__version__}"}
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=2) as response:
-            res_data = json.loads(response.read().decode("utf-8"))
-            if res_data:
-                lat = float(res_data[0]["lat"])
-                lng = float(res_data[0]["lon"])
-                
-                if data:
-                    try:
-                        for r in data.get("regions", []):
-                            if r.get("name") == region_name:
-                                for c in r.get("communes", []):
-                                    if c.get("name") == commune_name:
-                                        c["lat"] = lat
-                                        c["lng"] = lng
-                                        break
-                        with open(json_path, "w", encoding="utf-8") as f:
-                            json.dump(data, f, ensure_ascii=False, indent=4)
-                    except Exception as w_err:
-                        print(f"No se pudo escribir caché en regiones.json: {w_err}")
-                
-                return lat, lng
+        with httpx.Client(timeout=2.0) as client:
+            response = client.get(url, headers=headers)
+            if response.status_code == 200:
+                res_data = response.json()
+                if res_data:
+                    lat = float(res_data[0]["lat"])
+                    lng = float(res_data[0]["lon"])
+                    
+                    lat = float(res_data[0]["lat"])
+                    lng = float(res_data[0]["lon"])
+                    return lat, lng
     except Exception as g_err:
         print(f"Fallo al geocodificar comuna {commune_name}: {g_err}")
 
@@ -868,7 +865,7 @@ def render_main_dashboard():
     
     missing_docs = []
     if "cip" not in uploaded_types:
-        missing_docs.append("Certificado de Informaciones Previas (CIP)")
+        missing_docs.append("Certificado de Informaciones Previos (CIP)")
     if "ett" not in uploaded_types:
         missing_docs.append("Especificaciones Técnicas (ETT)")
         
