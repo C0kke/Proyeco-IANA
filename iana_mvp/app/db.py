@@ -20,10 +20,13 @@ def get_supabase_client(jwt_token: Optional[str] = None) -> Client:
     if jwt_token:
         client = create_client(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
         client.postgrest.auth(jwt_token)
-        if hasattr(client.storage, "_headers"):
-            client.storage._headers.update({"Authorization": f"Bearer {jwt_token}"})
-        if hasattr(client.storage, "_client") and hasattr(client.storage._client, "headers"):
-            client.storage._client.headers.update({"Authorization": f"Bearer {jwt_token}"})
+        
+        if hasattr(client, "storage") and client.storage:
+            if hasattr(client.storage, "session") and hasattr(client.storage.session, "headers"):
+                client.storage.session.headers.update({"Authorization": f"Bearer {jwt_token}"})
+            if hasattr(client.storage, "_headers"):
+                client.storage._headers.update({"Authorization": f"Bearer {jwt_token}"})
+                
         return client
     else:
         return create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
@@ -221,3 +224,12 @@ def update_project_context_db(project_id: str, context_data: Dict[str, Any], jwt
     except Exception as e:
         logger.error(f"Error al actualizar contexto del proyecto: {e}")
         return {"success": False, "error": str(e)}
+
+def list_project_documents(project_id: str, jwt_token: str) -> List[Dict[str, Any]]:
+    client = get_supabase_client(jwt_token)
+    try:
+        res = client.table("documents").select("*").eq("project_id", project_id).execute()
+        return res.data if res.data else []
+    except Exception as e:
+        logger.error(f"Error al listar documentos del proyecto: {e}")
+        return []

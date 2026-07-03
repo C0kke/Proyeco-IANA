@@ -9,6 +9,7 @@ from fastapi import FastAPI, File, UploadFile, Response, Depends, Header, HTTPEx
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
+from typing import Optional
 
 from .pdf_extract import extract_text_blocks
 from .report import render_html_report
@@ -305,6 +306,19 @@ def get_job_if_authorized(job_id: str, user_id: str) -> Optional[dict]:
         print(f"Error checking ownership for job {job_id}: {e}")
     return None
 
+def get_job_if_authorized(job_id: str, user_id: str) -> Optional[dict]:
+    path = os.path.join(RESULTS, f"{job_id}.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if data.get("user_id") == user_id:
+            return data
+    except (OSError, ValueError) as err:
+        print(f"Error checking ownership for job {job_id}: {err}")
+    return None
+
 @app.get("/api/status/{job_id}")
 def status(job_id: str, current_user: dict = Depends(get_current_user)) -> JSONResponse:
     job_data = get_job_if_authorized(job_id, current_user["user"].id)
@@ -361,8 +375,8 @@ def list_jobs(page: int = 1, page_size: int = 10, current_user: dict = Depends(g
             if data.get("user_id") == user_id:
                 mtime = os.path.getmtime(path)
                 authorized_jobs.append((data, mtime))
-        except Exception:
-            pass
+        except (OSError, ValueError) as err:
+            print(f"Error reading result file {path}: {err}")
             
     authorized_jobs.sort(key=lambda x: x[1], reverse=True)
     
@@ -424,11 +438,11 @@ class ProjectCreateRequest(BaseModel):
     project_type: str = "private_housing"
     region: str
     commune: str
-    latitude: float = None
-    longitude: float = None
-    terrain_rol: str = ""
-    block: str = ""
-    lot: str = ""
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    terrain_rol: Optional[str] = None
+    block: Optional[str] = None
+    lot: Optional[str] = None
 
 @app.post("/api/projects")
 def api_create_project(req: ProjectCreateRequest, current_user: dict = Depends(get_current_user)):
