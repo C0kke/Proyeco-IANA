@@ -18,14 +18,15 @@ if not SUPABASE_URL or not SUPABASE_PUBLISHABLE_KEY or not SUPABASE_SECRET_KEY:
 
 def get_supabase_client(jwt_token: Optional[str] = None) -> Client:
     if jwt_token:
+        access_token = jwt_token.split(":::")[0] if ":::" in jwt_token else jwt_token
         client = create_client(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
-        client.postgrest.auth(jwt_token)
+        client.postgrest.auth(access_token)
         
         if hasattr(client, "storage") and client.storage:
             if hasattr(client.storage, "session") and hasattr(client.storage.session, "headers"):
-                client.storage.session.headers.update({"Authorization": f"Bearer {jwt_token}"})
+                client.storage.session.headers.update({"Authorization": f"Bearer {access_token}"})
             if hasattr(client.storage, "_headers"):
-                client.storage._headers.update({"Authorization": f"Bearer {jwt_token}"})
+                client.storage._headers.update({"Authorization": f"Bearer {access_token}"})
                 
         return client
     else:
@@ -36,10 +37,11 @@ def sign_in_user(email: str, password: str) -> Dict[str, Any]:
     try:
         response = admin_client.auth.sign_in_with_password({"email": email, "password": password})
         if response.session:
+            combined_token = f"{response.session.access_token}:::{response.session.refresh_token}"
             return {
                 "success": True,
                 "user": response.user,
-                "jwt_token": response.session.access_token,
+                "jwt_token": combined_token,
                 "session": response.session
             }
         return {"success": False, "error": "No se pudo iniciar sesión."}
@@ -72,9 +74,35 @@ def sign_up_user(email: str, password: str, name: str, phone: str, rut: str, rol
 def verify_jwt_session(jwt_token: str) -> Dict[str, Any]:
     admin_client = get_supabase_client()
     try:
-        response = admin_client.auth.get_user(jwt_token)
-        if response.user:
-            return {"success": True, "user": response.user}
+        access_token = jwt_token
+        refresh_token = None
+        if ":::" in jwt_token:
+            parts = jwt_token.split(":::")
+            access_token = parts[0]
+            if len(parts) > 1:
+                refresh_token = parts[1]
+                
+        try:
+            response = admin_client.auth.get_user(access_token)
+            if response.user:
+                return {
+                    "success": True, 
+                    "user": response.user,
+                    "jwt_token": jwt_token
+                }
+        except Exception:
+            if refresh_token:
+                logger.info("Access token expirado. Intentando refrescar sesión...")
+                refresh_res = admin_client.auth.refresh_session(refresh_token)
+                if refresh_res.session:
+                    new_combined = f"{refresh_res.session.access_token}:::{refresh_res.session.refresh_token}"
+                    return {
+                        "success": True,
+                        "user": refresh_res.user,
+                        "jwt_token": new_combined,
+                        "refreshed": True
+                    }
+                    
         return {"success": False, "error": "Token JWT inválido o expirado."}
     except Exception as e:
         logger.error(f"Error verificando JWT: {e}")
@@ -233,3 +261,34 @@ def list_project_documents(project_id: str, jwt_token: str) -> List[Dict[str, An
     except Exception as e:
         logger.error(f"Error al listar documentos del proyecto: {e}")
         return []
+
+def delete_project_document(doc_id: str, jwt_token: str) -> Dict[str, Any]:
+    client = get_supabase_client(jwt_token)
+    try:
+        doc_res = client.table("documents").select("*").eq("id", doc_id).execute()
+        if not doc_res.data:
+            return {"success": False, "error": "El documento no existe."}
+            
+        doc = doc_res.data[0]
+        bucket_path = doc.get("bucket_path", "")
+        
+        if bucket_path:
+            if bucket_path.startswith("local://fallback/"):
+                filename = os.path.basename(bucket_path.replace("local://fallback/", ""))
+                local_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "uploads", "fallback", filename)
+                if os.path.exists(local_path):
+                    try:
+                        os.remove(local_path)
+                    except Exception as fs_err:
+                        logger.error(f"Error borrando archivo local de fallback: {fs_err}")
+            else:
+                try:
+                    client.storage.from_("project-documents").remove([bucket_path])
+                except Exception as storage_err:
+                    logger.error(f"Error al borrar archivo del storage de Supabase: {storage_err}")
+                    
+        client.table("documents").delete().eq("id", doc_id).execute()
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error al eliminar documento: {e}")
+        return {"success": False, "error": str(e)}

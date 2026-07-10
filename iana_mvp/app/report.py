@@ -31,8 +31,16 @@ HTML_TMPL = Template(
   <div class="meta">
     Archivo: <b>{{ result.filename }}</b> &middot; 
     Proyecto: <strong>{{ result.project_name }}</strong> &middot; 
+    Estado: <strong>{{ status_label }}</strong> &middot; 
     Viabilidad Normativa: <strong>{{ "%.1f"|format(result.success_probability) }}%</strong>
   </div>
+
+  {% if result.observaciones %}
+  <div class="summary-box" style="margin-bottom: 12px; background-color: #f1f5f9;">
+    <h3>Observaciones / Contexto del Documento:</h3>
+    <p style="white-space: pre-line; margin: 0; color: #475569;">{{ result.observaciones }}</p>
+  </div>
+  {% endif %}
 
   <div class="summary-box">
     <h3>Resumen Ejecutivo:</h3>
@@ -293,13 +301,7 @@ PDF_TMPL = Template(
       <p><b>Archivo Analizado:</b> {{ result.filename }}</p>
       <p><b>Proyecto Registrado:</b> {{ result.project_name }}</p>
       <p><b>Fecha de Emisión:</b> {{ created_at }}</p>
-      <p><b>Estado de Viabilidad:</b> 
-        {% if result.infractions|length > 0 %}
-          Aprobado con observaciones
-        {% else %}
-          Aprobado
-        {% endif %}
-      </p>
+      <p><b>Estado de Viabilidad:</b> {{ status_label }}</p>
       <p><b>Cumplimiento Normativo:</b> {{ "%.1f"|format(result.success_probability) }}%</p>
     </div>
     <div style="margin-top: 30px; font-size: 7.5px; color: #777777; text-align: left; width: 60%; margin-left: auto; line-height: 1.25;">
@@ -324,15 +326,18 @@ PDF_TMPL = Template(
       <td>
         <div class="metric-label">Estado General</div>
         <div class="metric-value" style="font-size: 11px; font-weight: bold; padding-top: 2px;">
-          {% if result.infractions|length > 0 %}
-            Aprobado con obs.
-          {% else %}
-            Aprobado
-          {% endif %}
+          {{ status_label }}
         </div>
       </td>
     </tr>
   </table>
+
+  {% if result.observaciones %}
+  <div class="summary-box" style="margin-top: 10px; background-color: #f8fafc; padding: 10px; border-radius: 4px; border-left: 3px solid #0d47a1;">
+    <h3 style="margin-top: 0; margin-bottom: 4px; color: #0d47a1; font-weight: bold; text-transform: uppercase;">Observaciones del Documento</h3>
+    <p class="summary-text" style="color: #475569;">{{ result.observaciones }}</p>
+  </div>
+  {% endif %}
 
   <div class="summary-box">
     <h3>Análisis y Observaciones Generales</h3>
@@ -378,12 +383,29 @@ PDF_TMPL = Template(
 )
 
 
+def get_status_label(result: Dict[str, Any]) -> str:
+    is_valid = result.get("is_valid", True)
+    success_probability = result.get("success_probability", 0.0)
+    
+    if not is_valid:
+        return "Rechazado (No Válido)"
+    if success_probability < 40.0:
+        return "Rechazado"
+    elif success_probability < 75.0:
+        return "Reformular"
+    elif success_probability < 95.0:
+        return "Aprobado con obs."
+    else:
+        return "Aprobado"
+
+
 def render_html_report(filename: str, result: Dict[str, Any]) -> str:
     """
     Renderiza el reporte HTML utilizando la plantilla original (llamativa) del validador.
     Soporta la estructura de infractions (IA).
     """
-    return HTML_TMPL.render(filename=filename, result=result)
+    status_label = get_status_label(result)
+    return HTML_TMPL.render(filename=filename, result=result, status_label=status_label)
 
 
 def render_pdf_report(filename: str, result: Dict[str, Any]) -> bytes:
@@ -393,7 +415,13 @@ def render_pdf_report(filename: str, result: Dict[str, Any]) -> bytes:
     import fitz
 
     now_str = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-    html_content = PDF_TMPL.render(filename=filename, result=result, created_at=now_str)
+    status_label = get_status_label(result)
+    html_content = PDF_TMPL.render(
+        filename=filename, 
+        result=result, 
+        created_at=now_str, 
+        status_label=status_label
+    )
     
     doc = fitz.open("html", html_content.encode("utf-8"))
     pdf_bytes = doc.convert_to_pdf()
