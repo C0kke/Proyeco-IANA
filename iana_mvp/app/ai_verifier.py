@@ -59,6 +59,9 @@ class DocumentSpecificAnalysis(BaseModel):
     document_summary: str = Field(
         description="Resumen corto de los aspectos técnicos y constructivos clave expuestos en este documento (máximo 300 palabras)."
     )
+    is_valid_architectural_doc: bool = Field(
+        description="Indica si el documento subido guarda relación directa con un proyecto de construcción, edificación, arquitectura, especificaciones técnicas de obra, planos, o información catastral (CIP). Si el documento trata de informática, programación, cocina, literatura, leyes no constructivas, o cualquier otro tema no relacionado, debe ser False."
+    )
     infractions: List[Infraction] = Field(
         description="Lista de infracciones o incumplimientos de la OGUC encontrados *únicamente* en este archivo. Si no hay, debe ser []"
     )
@@ -72,6 +75,9 @@ class ConsolidatedProjectEvaluation(BaseModel):
     """Evaluación consolidada acumulativa del proyecto"""
     consolidated_context: str = Field(
         description="Resumen acumulado actualizado del proyecto. Incorpora de forma fluida lo que ya sabíamos con lo aportado por el nuevo documento."
+    )
+    is_valid_project_documentation: bool = Field(
+        description="Indica si toda la documentación acumulada hasta el momento pertenece a un proyecto de edificación real y coherente. Si algún documento no tiene relación (es de informática, etc.), o es incompatible con el tipo de proyecto declarado, debe ser False."
     )
     consolidated_infractions: List[Infraction] = Field(
         description="Lista completa y limpia de alertas e infracciones normativas vigentes para todo el proyecto. Si una alerta previa fue resuelta por la evidencia aportada por el nuevo documento, no la incluyas aquí (resuelves la alerta)."
@@ -146,7 +152,7 @@ def retrieve_relevant_oguc_content(plan_text: str, oguc_text: str, max_tokens_bu
     print(f"Búsqueda semántica local: Seleccionados {len(selected_content)} artículos de la OGUC. Títulos: {selected_titles}")
     return "\n\n---\n\n".join(selected_content)
 
-def evaluate_project_with_ai(plan_text: str, oguc_text: str) -> ProjectEvaluation:
+def evaluate_project_with_ai(plan_text: str, oguc_text: str, observaciones: str = "") -> ProjectEvaluation:
     if not client:
         raise ValueError("El cliente de Gemini/Instructor no está inicializado.")
 
@@ -154,12 +160,19 @@ def evaluate_project_with_ai(plan_text: str, oguc_text: str) -> ProjectEvaluatio
 
     prompt = (
         "Actúa como un revisor municipal de edificación y analista experto en la OGUC de Chile.\n"
-        "Tu tarea es analizar el texto y cotas extraídas de un plano y compararlas con las exigencias de la OGUC para reportar infracciones.\n\n"
+        "Tu tarea es analizar el texto y cotas extraídas de los documentos de un proyecto y compararlas con las exigencias de la OGUC para reportar infracciones.\n\n"
+    )
+    if observaciones:
+        prompt += (
+            "--- CONTEXTO ADICIONAL / OBSERVACIONES PROPORCIONADAS POR EL PROYECTISTA ---\n"
+            f"{observaciones}\n\n"
+        )
+    prompt += (
         "--- LEY OFICIAL (ARTÍCULOS SELECCIONADOS DE LA OGUC CHILE) ---\n"
         f"{relevant_oguc}\n\n"
-        "--- DATOS EXTRAÍDOS DEL PLANO ANALIZADO ---\n"
+        "--- DATOS EXTRAÍDOS DEL PROYECTO ANALIZADO ---\n"
         f"{plan_text}\n\n"
-        "Analiza el plano en base a la ley y genera la evaluación en el formato estructurado."
+        "Analiza el proyecto en base a la ley y genera la evaluación en el formato estructurado."
     )
 
     response: ProjectEvaluation = client.chat.completions.create(
@@ -173,7 +186,8 @@ def evaluate_project_with_ai(plan_text: str, oguc_text: str) -> ProjectEvaluatio
 def evaluate_document_individually(
     doc_text: str, 
     doc_type: str, 
-    oguc_text: str
+    oguc_text: str,
+    observaciones: str = ""
 ) -> DocumentSpecificAnalysis:
     """
     Realiza un análisis individual de un documento específico de acuerdo a su tipo
@@ -187,6 +201,13 @@ def evaluate_document_individually(
     prompt = (
         "Actúa como un revisor normativo experto en edificación de Chile.\n"
         f"Analiza este documento de tipo: '{doc_type}' contra los artículos relevantes de la OGUC.\n\n"
+    )
+    if observaciones:
+        prompt += (
+            "--- CONTEXTO/OBSERVACIONES DEL PROYECTISTA PARA ESTE DOCUMENTO ---\n"
+            f"{observaciones}\n\n"
+        )
+    prompt += (
         "--- LEY OFICIAL (OGUC CHILE) ---\n"
         f"{relevant_oguc}\n\n"
         "--- CONTENIDO DEL ARCHIVO ---\n"
@@ -196,6 +217,7 @@ def evaluate_document_individually(
         "2. Identificar infracciones a la OGUC presentes únicamente en este archivo.\n"
         "3. Extraer metadatos claves (ej: 'rol_terreno', 'comuna', 'region', 'superficie_terreno', "
         "'altura_maxima', 'manzana', 'lote', 'constructibilidad', 'ocupacion_suelo') en formato clave-valor.\n"
+        "4. Determinar si el documento tiene relación directa con arquitectura, edificación, construcción, planos, ETT, CIP, etc. Si el documento trata de informática, software, cocina, literatura, u otro tema no constructivo, debes marcar is_valid_architectural_doc = False; de lo contrario, True.\n"
     )
 
     response: DocumentSpecificAnalysis = client.chat.completions.create(
@@ -234,6 +256,17 @@ def consolidate_project_context(
         f"Tipo de proyecto: {project_metadata.get('project_type')}\n"
         f"Ubicación: Comuna de {project_metadata.get('commune')}, Región {project_metadata.get('region')}\n"
         f"Ficha catastral: Rol {project_metadata.get('terrain_rol')}, Manzana {project_metadata.get('block')}, Lote {project_metadata.get('lot')}\n\n"
+    )
+    
+    meta = project_metadata.get("extracted_metadata", {}) or {}
+    observations = meta.get("observations", "")
+    if observations:
+        prompt += (
+            "--- CONTEXTO ADICIONAL / OBSERVACIONES DEL PROYECTISTA ---\n"
+            f"{observations}\n\n"
+        )
+        
+    prompt += (
         "--- CONTEXTO ACUMULADO PREVIO ---\n"
         f"{existing_context}\n\n"
         "--- INFRACCIONES/ALERTAS PENDIENTES PREVIAS ---\n"
@@ -247,7 +280,8 @@ def consolidate_project_context(
         "2. **Resuelve Infracciones Previas:** Analiza si los nuevos datos o el nuevo plano justifican/sanan alguna alerta anterior. Si es así, elimínala de las infracciones consolidadas.\n"
         "3. **Agrega Nuevas Infracciones:** Si el nuevo documento contiene nuevas fallas normativas que no estaban documentadas, agrégalas a la lista.\n"
         "4. **Combina Metadatos:** Unifica los metadatos anteriores con los del nuevo archivo.\n"
-        "5. **Estima la Viabilidad:** Recalcula el porcentaje de éxito (0.0 a 100.0) de aprobación final municipal.\n"
+        "5. **Estima la Viabilidad:** Recalcula el porcentaje de éxito (0.0 a 100.0) de aprobación final municipal. Si is_valid_project_documentation es False, la viabilidad debe ser 0.0.\n"
+        "6. **Valida la Documentación del Proyecto:** Si el nuevo documento tiene is_valid_architectural_doc = False o no tiene relación alguna con edificación/construcción de viviendas, debes marcar is_valid_project_documentation = False; de lo contrario, True.\n"
     )
 
     response: ConsolidatedProjectEvaluation = client.chat.completions.create(
@@ -256,3 +290,86 @@ def consolidate_project_context(
         messages=[{"role": "user", "content": prompt}],
     )
     return response
+
+def rebuild_project_context(project_id: str, jwt_token: str, oguc_text: str) -> Dict[str, Any]:
+    import logging
+    logger = logging.getLogger("iana.rebuild")
+    
+    from app.db import get_supabase_client, update_project_context_db
+    
+    client_db = get_supabase_client(jwt_token)
+    try:
+        res = client_db.table("documents").select("*, document_analyses(*)").eq("project_id", project_id).order("uploaded_at", desc=False).execute()
+        docs = res.data or []
+        
+        proj_res = client_db.table("projects").select("*").eq("id", project_id).execute()
+        if not proj_res.data:
+            return {"success": False, "error": "El proyecto no existe."}
+        project = proj_res.data[0]
+        
+        if not docs:
+            reset_data = {
+                "consolidated_context": "Proyecto inicializado sin documentos cargados.",
+                "consolidated_infractions": [],
+                "success_probability": 0.0,
+                "extracted_metadata": {},
+                "terrain_rol": None,
+                "block": None,
+                "lot": None
+            }
+            return update_project_context_db(project_id, reset_data, jwt_token)
+            
+        consolidated_context = "Proyecto inicializado."
+        consolidated_infractions = []
+        current_meta = {}
+        
+        last_success_probability = 100.0
+        
+        for doc in docs:
+            analyses = doc.get("document_analyses", [])
+            if not analyses:
+                continue
+                
+            analysis_data = analyses[0]
+            doc_analysis = DocumentSpecificAnalysis(
+                document_summary=analysis_data.get("extracted_text_summary", ""),
+                is_valid_architectural_doc=analysis_data.get("metadata", {}).get("is_valid", True),
+                infractions=[Infraction(**inf) for inf in (analysis_data.get("infractions") or [])],
+                extracted_metadata=analysis_data.get("metadata") or {}
+            )
+            
+            consolidated = consolidate_project_context(
+                project_metadata=project,
+                existing_context=consolidated_context,
+                existing_infractions=consolidated_infractions,
+                new_doc_analysis=doc_analysis,
+                oguc_text=oguc_text
+            )
+            
+            consolidated_context = consolidated.consolidated_context
+            consolidated_infractions = [inf.model_dump() for inf in consolidated.consolidated_infractions]
+            current_meta = {**current_meta, **consolidated.extracted_metadata}
+            current_meta["is_valid"] = consolidated.is_valid_project_documentation
+            last_success_probability = consolidated.success_probability
+            
+            obs = doc_analysis.extracted_metadata.get("observations", "")
+            if obs:
+                current_meta["observations"] = obs
+                
+        update_res = update_project_context_db(
+            project_id=project_id,
+            context_data={
+                "consolidated_context": consolidated_context,
+                "consolidated_infractions": consolidated_infractions,
+                "success_probability": last_success_probability,
+                "extracted_metadata": current_meta,
+                "terrain_rol": current_meta.get("rol_terreno"),
+                "block": current_meta.get("manzana"),
+                "lot": current_meta.get("lote")
+            },
+            jwt_token=jwt_token
+        )
+        return update_res
+    except Exception as e:
+        logger.error(f"Error al reconstruir el contexto del proyecto: {e}")
+        return {"success": False, "error": str(e)}

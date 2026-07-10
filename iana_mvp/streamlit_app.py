@@ -3,7 +3,23 @@ import os
 import uuid
 import json
 import urllib.parse
+import re
 from datetime import datetime
+
+def is_duplicate_or_copy_name(name1: str, name2: str) -> bool:
+    """
+    Compara dos nombres de archivo ignorando mayúsculas/minúsculas, extensiones
+    y sufijos de copia comunes como (1), - copia, _1, etc.
+    """
+    base1 = os.path.splitext(name1)[0].lower().strip()
+    base2 = os.path.splitext(name2)[0].lower().strip()
+    
+    suffix_pattern = re.compile(r'(\s*[\(\-_]\d+\)?|\s*-\s*copia)$', re.IGNORECASE)
+    
+    clean1 = suffix_pattern.sub('', base1).strip()
+    clean2 = suffix_pattern.sub('', base2).strip()
+    
+    return clean1 == clean2
 
 from app.version import __version__
 from app.pdf_extract import extract_text_blocks
@@ -114,119 +130,32 @@ if st.session_state["user"] is None and cookie_token:
     res = verify_jwt_session(cookie_token)
     if res["success"]:
         st.session_state["user"] = res["user"]
-        st.session_state["jwt_token"] = cookie_token
+        st.session_state["jwt_token"] = res["jwt_token"]
+        if res.get("refreshed"):
+            st.session_state["cookie_to_set"] = res["jwt_token"]
         try:
-            st.session_state["projects"] = list_user_projects(cookie_token)
+            st.session_state["projects"] = list_user_projects(res["jwt_token"])
             st.session_state["active_project"] = None
         except Exception as e:
             print(f"Error al restaurar proyectos tras recarga: {e}")
 
-st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Outfit', sans-serif;
-    }
-    
-    .sidebar-title {
-        margin-top: -30px;
-        margin-bottom: 12px;
-        font-size: 16px;
-        font-weight: bold;
-        color: #1e293b;
-    }
-    .user-badge {
-        background-color: #eff6ff;
-        color: #1d4ed8;
-        padding: 4px 8px;
-        border-radius: 9999px;
-        font-size: 11px;
-        font-weight: 600;
-        display: inline-block;
-        margin-bottom: 12px;
-        border: 1px solid #bfdbfe;
-    }
-    .project-card {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
-        border: 1px solid #e2e8f0;
-        padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
-    }
-    .project-header {
-        font-size: 22px;
-        font-weight: 700;
-        color: #0f172a;
-        margin-bottom: 6px;
-    }
-    .project-meta {
-        font-size: 13px;
-        color: #64748b;
-        margin-bottom: 10px;
-    }
-    .metric-value {
-        font-size: 28px;
-        font-weight: 700;
-        color: #0f172a;
-    }
-    
-    .welcome-container {
-        text-align: center;
-        padding: 40px;
-        max-width: 800px;
-        margin: 0 auto;
-    }
-    .welcome-title {
-        font-size: 36px;
-        font-weight: 700;
-        color: #0f172a;
-        margin-bottom: 15px;
-    }
-    .welcome-subtitle {
-        font-size: 16px;
-        color: #64748b;
-        margin-bottom: 40px;
-        line-height: 1.6;
-    }
-    .option-card {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 24px;
-        text-align: center;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
-        transition: transform 0.2s, box-shadow 0.2s;
-        height: 100%;
-        margin-bottom: 15px;
-    }
-    .option-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-    }
-    .option-icon {
-        font-size: 40px;
-        margin-bottom: 16px;
-    }
-    .option-title {
-        font-size: 20px;
-        font-weight: 600;
-        color: #0f172a;
-        margin-bottom: 8px;
-    }
-    .option-desc {
-        font-size: 14px;
-        color: #64748b;
-        margin-bottom: 20px;
-        min-height: 60px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+styles_path = os.path.join(os.path.dirname(__file__), "index.css")
+if os.path.exists(styles_path):
+    with open(styles_path, "r", encoding="utf-8") as f:
+        custom_css = f.read()
+    st.markdown(f"<style>{custom_css}</style>", unsafe_allow_html=True)
+else:
+    st.markdown(
+        """
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;700&display=swap');
+        html, body, [class*="css"] {
+            font-family: 'Exo 2', sans-serif;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 REGION_COORDS = {
     "Arica y Parinacota": (-18.4783, -70.3126),
@@ -498,9 +427,13 @@ def render_create_project_modal():
         st.rerun()
         
     if submitted:
-        if p_name and p_region and p_commune:
+        if not p_name.strip():
+            st.error("El Nombre del Proyecto es obligatorio.")
+        elif not p_region or not p_commune:
+            st.error("La Región y Comuna son obligatorias.")
+        else:
             p_data = {
-                "name": p_name,
+                "name": p_name.strip(),
                 "project_type": p_type,
                 "region": p_region,
                 "commune": p_commune,
@@ -514,14 +447,14 @@ def render_create_project_modal():
             with st.spinner("Creando proyecto..."):
                 res = create_project(p_data, st.session_state["jwt_token"])
                 if res["success"]:
-                    st.success(f"Proyecto '{p_name}' creado con éxito.")
+                    st.success(f"Proyecto '{p_name.strip()}' creado con éxito.")
                     st.session_state["projects"] = list_user_projects(st.session_state["jwt_token"])
                     st.session_state["active_project"] = res["project"]
                     st.rerun()
                 else:
                     st.error(f"Error al guardar: {res['error']}")
-        else:
-            st.warning("Por favor, completa los campos obligatorios (*).")
+    else:
+        st.warning("Por favor, completa los campos obligatorios (*).")
 
 @st.dialog("✏️ Editar Detalles del Proyecto", width="large")
 def render_edit_project_modal():
@@ -579,7 +512,11 @@ def render_edit_project_modal():
         st.rerun()
         
     if submitted:
-        if p_name and p_region and p_commune:
+        if not p_name.strip():
+            st.error("El Nombre del Proyecto es obligatorio.")
+        elif not p_region or not p_commune:
+            st.error("La Región y Comuna son obligatorias.")
+        else:
             lat_val = p_lat
             lng_val = p_lng
             if (p_commune != p["commune"] or p_region != p["region"]) and (p_lat == p["latitude"] and p_lng == p["longitude"]):
@@ -588,7 +525,7 @@ def render_edit_project_modal():
                 lng_val = calc_lng
                 
             update_data = {
-                "name": p_name,
+                "name": p_name.strip(),
                 "region": p_region,
                 "commune": p_commune,
                 "latitude": lat_val,
@@ -610,8 +547,8 @@ def render_edit_project_modal():
                     st.rerun()
                 else:
                     st.error(f"Error al guardar: {res['error']}")
-        else:
-            st.warning("Por favor, completa los campos obligatorios (*).")
+    else:
+        st.warning("Por favor, completa los campos obligatorios (*).")
 
 def get_jobs_history(project_id: str):
     if not os.path.exists(RESULTS):
@@ -720,6 +657,40 @@ def display_results(result_data):
         else:
             st.button("Reporte PDF no disponible", disabled=True, use_container_width=True)
 
+@st.dialog("⚠️ Eliminar Documento")
+def confirm_delete_document(doc_id: str, doc_name: str, project_id: str):
+    st.write(f"¿Estás seguro de que deseas eliminar el documento **{doc_name}** de este proyecto?")
+    st.write("Esta acción borrará el archivo de la base de datos, el storage, y **recalculará toda la viabilidad y alertas consolidando los documentos restantes.**")
+    st.write("")
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        if st.button("Sí, Eliminar", type="primary", use_container_width=True):
+            with st.spinner("Eliminando documento y reconstruyendo contexto..."):
+                from app.db import delete_project_document
+                from app.ai_verifier import rebuild_project_context
+                
+                del_res = delete_project_document(doc_id, st.session_state["jwt_token"])
+                if del_res["success"]:
+                    rebuild_res = rebuild_project_context(project_id, st.session_state["jwt_token"], OGUC_CONTENT)
+                    if rebuild_res["success"]:
+                        st.success("Documento eliminado con éxito y contexto reconstruido.")
+                        st.session_state["projects"] = list_user_projects(st.session_state["jwt_token"])
+                        for updated_p in st.session_state["projects"]:
+                            if updated_p["id"] == project_id:
+                                st.session_state["active_project"] = updated_p
+                                break
+                        st.session_state["viewing_pdf_id"] = None
+                        st.session_state["docs_cache"] = None
+                        st.session_state["history_cache"] = None
+                        st.rerun()
+                    else:
+                        st.error(f"Error al reconstruir contexto: {rebuild_res['error']}")
+                else:
+                    st.error(f"Error al eliminar: {del_res['error']}")
+    with col_c2:
+        if st.button("Cancelar", use_container_width=True):
+            st.rerun()
+
 def render_main_dashboard():
     st.sidebar.markdown(f"**{st.session_state['user'].email}**")
     
@@ -766,6 +737,7 @@ def render_main_dashboard():
                     st.session_state["docs_cache"] = None
                     st.session_state["history_cache"] = None
                     st.session_state["viewing_pdf_id"] = None
+                    st.session_state["active_tab"] = "Validar Nuevo Documento"
                     st.rerun()
         else:
             st.sidebar.caption("No se encontraron proyectos.")
@@ -864,27 +836,19 @@ def render_main_dashboard():
     uploaded_types = {d["document_type"] for d in docs}
     
     missing_docs = []
-    if "cip" not in uploaded_types:
-        missing_docs.append("Certificado de Informaciones Previos (CIP)")
-    if "ett" not in uploaded_types:
-        missing_docs.append("Especificaciones Técnicas (ETT)")
-        
-    missing_planos = []
     if "site_plan" not in uploaded_types:
-        missing_planos.append("Emplazamiento General")
+        missing_docs.append("Plano de emplazamiento")
     if "sections" not in uploaded_types:
-        missing_planos.append("Cortes")
+        missing_docs.append("Plano de arquitectura")
     if "elevations" not in uploaded_types:
-        missing_planos.append("Elevaciones")
-        
-    if missing_planos:
-        missing_docs.append(f"Planos ({', '.join(missing_planos)})")
+        missing_docs.append("Elevaciones / cortes")
+    if "ett" not in uploaded_types:
+        missing_docs.append("Techumbre")
         
     if missing_docs:
         missing_str = ", ".join(missing_docs)
         st.warning(
-            f"Falta subir los siguientes documentos obligatorios para este proyecto: {missing_str}. "
-            "Es necesario cargarlos para obtener el número de ROL de terreno, manzana y lote."
+            f"Falta subir los siguientes documentos para este proyecto: {missing_str}."
         )
         
     st.write("")
@@ -895,90 +859,155 @@ def render_main_dashboard():
         st.session_state["file_uploader_key"] = "file_uploader_init"
 
     tab_options = ["Validar Nuevo Documento", "Documentos Asociados", "Historial de Aprobación"]
-    active_idx = tab_options.index(st.session_state["active_tab"]) if st.session_state["active_tab"] in tab_options else 0
     
-    selected_tab = st.radio(
+    st.radio(
         "Navegación",
         options=tab_options,
-        index=active_idx,
+        key="active_tab",
         horizontal=True,
         label_visibility="collapsed"
     )
-    st.session_state["active_tab"] = selected_tab
-    
-    st.write("")
     
     if st.session_state["active_tab"] == "Validar Nuevo Documento":
         st.subheader("Subir Documentación del Proyecto", anchor=False)
-        st.markdown("Sube planos, especificaciones técnicas (ETTs) o Certificados de Informaciones Previas (CIP) para verificar su cumplimiento normativo.")
+        st.markdown("Sube planos, especificaciones técnicas o elevaciones para verificar su cumplimiento normativo.")
+        
+        docs_list = st.session_state["docs_cache"] or []
+        if docs_list:
+            st.markdown("**Documentos integrados en la memoria y contexto del proyecto:**")
+            badges_html = '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;">'
+            for d in docs_list:
+                dtype = d.get("document_type")
+                fname = d.get("file_name", "")
+                if fname.startswith("[Techumbre] "):
+                    fname = fname[len("[Techumbre] "):]
+                    dtype_label = "Techumbre"
+                elif fname.startswith("[Otro] "):
+                    fname = fname[len("[Otro] "):]
+                    dtype_label = "Otro"
+                else:
+                    labels = {
+                        "cip": "CIP",
+                        "ett": "ETT",
+                        "site_plan": "Emplazamiento",
+                        "sections": "Arquitectura",
+                        "elevations": "Elevaciones/Cortes",
+                        "other": "Otro"
+                    }
+                    dtype_label = labels.get(dtype, dtype)
+                
+                badges_html += f'<span style="background-color: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">📄 {fname} <small style="color: #64748b; font-weight: 400;">({dtype_label})</small></span>'
+            badges_html += '</div>'
+            st.markdown(badges_html, unsafe_allow_html=True)
+        else:
+            st.markdown("<p style='color: #64748b; font-size: 12px; font-style: italic; margin-bottom: 15px;'>No hay documentos en la memoria de este proyecto. El primer archivo que subas inicializará el contexto.</p>", unsafe_allow_html=True)
+
+        st.info(
+            "**Flujo de Trabajo:** Al presionar 'Iniciar Validación', el archivo se "
+            "guardará en la base de datos del proyecto y la IA lo analizará. "
+            "Luego, **IANA evaluará incrementalmente todo el conjunto del proyecto**, "
+            "incluyendo este y los documentos previamente cargados."
+        )
         
         doc_type = st.selectbox(
             "Tipo de Documento a Subir",
-            options=["cip", "ett", "site_plan", "sections", "elevations", "other"],
+            options=["cip", "ett", "site_plan", "sections", "elevations", "techumbre", "other"],
             format_func=lambda x: {
-                "cip": "Certificado de Informaciones Previos (CIP)",
-                "ett": "Especificaciones Técnicas de Trabajo (ETT)",
-                "site_plan": "Plano de Emplazamiento General",
-                "sections": "Plano de Cortes",
-                "elevations": "Plano de Elevaciones",
-                "other": "Otro Documento Complementario"
+                "cip": "Certificado de Informaciones Previas (CIP)",
+                "ett": "Especificaciones Técnicas (ETT)",
+                "site_plan": "Plano de emplazamiento",
+                "sections": "Plano de arquitectura",
+                "elevations": "Elevaciones / cortes",
+                "techumbre": "Techumbre",
+                "other": "Otro documento"
             }[x]
         )
         
         uploaded_file = st.file_uploader(
-            "Selecciona el archivo PDF del proyecto:",
-            type=["pdf"],
+            "Selecciona el archivo PDF o Word (.docx) del proyecto:",
+            type=["pdf", "docx"],
             key=st.session_state["file_uploader_key"],
-            help="El archivo debe tener texto seleccionable (no imágenes puras sin OCR)."
+            help="El archivo debe tener texto seleccionable o ser un archivo de Word (.docx)."
         )
         
         active_job_id = st.query_params.get("job_id")
         
+        p_obs = st.text_area(
+            "Observaciones / Contexto Adicional para este Documento",
+            value="",
+            placeholder="Entrega contexto sobre este documento en particular para guiar a la IA...",
+            help="Estas observaciones se enviarán a la IA para guiar la revisión."
+        )
+        
         if uploaded_file is not None:
             st.info(f"Archivo listo: **{uploaded_file.name}** ({uploaded_file.size / 1024:.2f} KB)")
             
-            if st.button("Iniciar Validación Normativa con IA", type="primary", use_container_width=True):
-                job_id = str(uuid.uuid4())
-                pdf_path = os.path.join(UPLOADS, f"{job_id}.pdf")
+            docs_list = st.session_state["docs_cache"] or []
+            duplicate_doc = None
+            for d in docs_list:
+                clean_db_name = d.get("file_name", "")
+                if clean_db_name.startswith("[Techumbre] "):
+                    clean_db_name = clean_db_name[len("[Techumbre] "):]
+                elif clean_db_name.startswith("[Otro] "):
+                    clean_db_name = clean_db_name[len("[Otro] "):]
                 
-                with st.spinner("Procesando y almacenando archivo en Storage..."):
-                    file_bytes = uploaded_file.getvalue()
-                    
-                    db_res = upload_project_document(
-                        user_id=st.session_state["user"].id,
-                        project_id=p["id"],
-                        file_name=uploaded_file.name,
-                        file_bytes=file_bytes,
-                        document_type=doc_type,
-                        jwt_token=st.session_state["jwt_token"]
-                    )
-                    
-                    with open(pdf_path, "wb") as handle:
-                        handle.write(file_bytes)
+                if is_duplicate_or_copy_name(uploaded_file.name, clean_db_name):
+                    duplicate_doc = clean_db_name
+                    break
+            
+            confirm_upload = True
+            if duplicate_doc:
+                st.warning(f"El archivo **'{uploaded_file.name}'** parece ser un duplicado o una copia de **'{duplicate_doc}'** que ya fue subido a este proyecto.")
+                confirm_upload = st.checkbox("Entiendo que es una copia y deseo subirlo de todas formas", value=False)
+                
+            button_disabled = not confirm_upload
+            if st.button("Iniciar Validación Normativa con IA", type="primary", use_container_width=True, disabled=button_disabled):
+                job_id = str(uuid.uuid4())
+                ext = os.path.splitext(uploaded_file.name)[1].lower()
+                pdf_path = os.path.join(UPLOADS, f"{job_id}{ext}")
+                
+                try:
+                    with st.spinner("Procesando y almacenando archivo en Storage..."):
+                        file_bytes = uploaded_file.getvalue()
                         
-                    if db_res.get("storage_location") == "local_fallback":
-                        st.warning("No se pudo conectar con el storage remoto. El archivo se guardó localmente en modo fallback de emergencia y el análisis continuará normalmente.")
-                    else:
-                        st.success("Archivo guardado y respaldado en Supabase Storage con políticas RLS de seguridad.")
+                        db_doc_type = doc_type
+                        display_filename = uploaded_file.name
+                        if doc_type == "techumbre":
+                            db_doc_type = "other"
+                            display_filename = f"[Techumbre] {uploaded_file.name}"
+                        elif doc_type == "other":
+                            display_filename = f"[Otro] {uploaded_file.name}"
+                        
+                        db_res = upload_project_document(
+                            user_id=st.session_state["user"].id,
+                            project_id=p["id"],
+                            file_name=display_filename,
+                            file_bytes=file_bytes,
+                            document_type=db_doc_type,
+                            jwt_token=st.session_state["jwt_token"]
+                        )
+                        
+                        with open(pdf_path, "wb") as handle:
+                            handle.write(file_bytes)
+                            
+                        if db_res.get("storage_location") == "local_fallback":
+                            st.warning("No se pudo conectar con el storage remoto. El archivo se guardó localmente en modo fallback de emergencia y el análisis continuará normalmente.")
+                        else:
+                            st.success("Archivo guardado y respaldado en Supabase Storage con políticas RLS de seguridad.")
 
-                with st.spinner("Extrayendo texto del PDF..."):
-                    try:
+                    with st.spinner("Extrayendo texto del archivo..."):
                         blocks = extract_text_blocks(pdf_path)
                         plan_text = "\n".join([b.text for b in blocks])
-                    except Exception as e:
-                        st.error(f"Error al extraer texto del PDF: {e}")
-                        st.stop()
                         
-                if not plan_text.strip():
-                    st.error("El PDF no contiene texto legible (sin capa OCR). Por favor sube un archivo procesable.")
-                    st.stop()
-                    
-                with st.spinner("Realizando análisis individual de este documento (Gemini AI)..."):
-                    try:
+                    if not plan_text.strip():
+                        raise ValueError("El archivo no contiene texto legible (sin capa de texto OCR o archivo vacío).")
+                        
+                    with st.spinner("Realizando análisis individual de este documento (Gemini AI)..."):
                         doc_analysis = evaluate_document_individually(
                             doc_text=plan_text,
                             doc_type=doc_type,
-                            oguc_text=OGUC_CONTENT
+                            oguc_text=OGUC_CONTENT,
+                            observaciones=p_obs.strip()
                         )
                         
                         if db_res.get("success") and "document" in db_res:
@@ -989,16 +1018,15 @@ def render_main_dashboard():
                                         "document_id": doc_id,
                                         "extracted_text_summary": doc_analysis.document_summary,
                                         "infractions": [inf.model_dump() for inf in doc_analysis.infractions],
-                                        "metadata": doc_analysis.extracted_metadata
+                                        "metadata": {
+                                            **doc_analysis.extracted_metadata,
+                                            "observations": p_obs.strip()
+                                        }
                                     }, st.session_state["jwt_token"])
                                 except Exception as db_err:
-                                    st.error(f"No se pudo guardar el análisis individual en la base de datos: {db_err}")
-                    except Exception as e:
-                        st.error(f"Error al analizar el documento: {e}")
-                        st.stop()
+                                    st.warning(f"No se pudo guardar el análisis individual en la base de datos: {db_err}")
 
-                with st.spinner("Consolidando contexto histórico e integrando alertas..."):
-                    try:
+                    with st.spinner("Consolidando contexto histórico e integrando alertas..."):
                         existing_context = p.get("consolidated_context", "") or "Proyecto inicializado."
                         existing_infractions = p.get("consolidated_infractions", []) or []
                         
@@ -1019,7 +1047,7 @@ def render_main_dashboard():
                                 "extracted_metadata": consolidated.extracted_metadata,
                                 "terrain_rol": consolidated.extracted_metadata.get("rol_terreno", p.get("terrain_rol")),
                                 "block": consolidated.extracted_metadata.get("manzana", p.get("block")),
-                                "lot": consolidated.extracted_metadata.get("lote", p.get("lot"))
+                                "lot": consolidated.extracted_metadata.get("lote", p.get("lote"))
                             },
                             jwt_token=st.session_state["jwt_token"]
                         )
@@ -1031,36 +1059,36 @@ def render_main_dashboard():
                                     st.session_state["active_project"] = updated_p
                                     break
                         else:
-                            st.error(f"Error al actualizar el contexto consolidado en la DB: {update_res['error']}")
+                            raise ValueError(f"Error al actualizar el contexto consolidado en la DB: {update_res['error']}")
                             
-                    except Exception as e:
-                        st.error(f"Error consolidando el contexto con IA: {e}")
-                        st.stop()
-                
-                result_data = {
-                    "job_id": job_id,
-                    "user_id": st.session_state["user"].id,
-                    "project_id": p["id"],
-                    "filename": uploaded_file.name,
-                    "project_name": p["name"],
-                    "success_probability": consolidated.success_probability,
-                    "infractions": [inf.model_dump() for inf in consolidated.consolidated_infractions],
-                    "summary_notes": consolidated.consolidated_context,
-                }
-                
-                out_json = os.path.join(RESULTS, f"{job_id}.json")
-                with open(out_json, "w", encoding="utf-8") as handle:
-                    json.dump(result_data, handle, ensure_ascii=False, indent=2)
+                    result_data = {
+                        "job_id": job_id,
+                        "user_id": st.session_state["user"].id,
+                        "project_id": p["id"],
+                        "filename": uploaded_file.name,
+                        "project_name": p["name"],
+                        "success_probability": consolidated.success_probability,
+                        "infractions": [inf.model_dump() for inf in consolidated.consolidated_infractions],
+                        "summary_notes": consolidated.consolidated_context,
+                        "observaciones": p_obs.strip()
+                    }
                     
-                out_html = os.path.join(RESULTS, f"{job_id}.html")
-                with open(out_html, "w", encoding="utf-8") as handle:
-                    handle.write(render_html_report(uploaded_file.name, result_data))
+                    out_json = os.path.join(RESULTS, f"{job_id}.json")
+                    with open(out_json, "w", encoding="utf-8") as handle:
+                        json.dump(result_data, handle, ensure_ascii=False, indent=2)
+                        
+                    out_html = os.path.join(RESULTS, f"{job_id}.html")
+                    with open(out_html, "w", encoding="utf-8") as handle:
+                        handle.write(render_html_report(uploaded_file.name, result_data))
+                        
+                    st.session_state["file_uploader_key"] = f"file_uploader_{uuid.uuid4()}"
+                    st.session_state["docs_cache"] = None
+                    st.session_state["history_cache"] = None
+                    st.query_params["job_id"] = job_id
+                    st.rerun()
                     
-                st.session_state["file_uploader_key"] = f"file_uploader_{uuid.uuid4()}"
-                st.session_state["docs_cache"] = None
-                st.session_state["history_cache"] = None
-                st.query_params["job_id"] = job_id
-                st.rerun()
+                except Exception as e:
+                    st.error(f"Ocurrió un error durante la validación: {e}")
                 
         if active_job_id:
             st.divider()
@@ -1082,15 +1110,25 @@ def render_main_dashboard():
         st.subheader("Documentos Asociados al Proyecto", anchor=False)
         st.markdown("Lista de planos y especificaciones técnicas oficiales cargados en este proyecto:")
         
-        DOC_TYPE_LABELS = {
-            "cip": "Certificado de Informaciones Previos (CIP)",
-            "ett": "Especificaciones Técnicas de Trabajo (ETT)",
-            "site_plan": "Plano de Emplazamiento General",
-            "sections": "Plano de Cortes",
-            "elevations": "Plano de Elevaciones",
-            "other": "Otro Documento Complementario"
-        }
-        
+        def get_display_label(doc):
+            dtype = doc.get("document_type")
+            fname = doc.get("file_name", "")
+            if dtype == "other":
+                if fname.startswith("[Techumbre]"):
+                    return "Techumbre"
+                elif fname.startswith("[Otro]"):
+                    return "Otro documento"
+                return "Otro documento"
+            
+            labels = {
+                "cip": "Certificado de Informaciones Previas (CIP)",
+                "ett": "Especificaciones Técnicas (ETT)",
+                "site_plan": "Plano de emplazamiento",
+                "sections": "Plano de arquitectura",
+                "elevations": "Elevaciones / cortes"
+            }
+            return labels.get(dtype, dtype)
+            
         docs = st.session_state["docs_cache"] or []
         if docs:
             for d in docs:
@@ -1103,17 +1141,24 @@ def render_main_dashboard():
                     except Exception:
                         dt_str = str(d["created_at"])[:16]
                         
-                col_d1, col_d2, col_d3 = st.columns([3, 2, 1])
+                col_d1, col_d2, col_d3, col_d4 = st.columns([3, 2, 1, 1])
                 with col_d1:
-                    st.markdown(f"**{d.get('file_name')}**")
+                    display_name = d.get('file_name', '')
+                    if display_name.startswith("[Techumbre] "):
+                        display_name = display_name[len("[Techumbre] "):]
+                    elif display_name.startswith("[Otro] "):
+                        display_name = display_name[len("[Otro] "):]
+                    st.markdown(f"**{display_name}**")
                     st.caption(f"Subido el {dt_str}")
                 with col_d2:
-                    doc_type_raw = d.get("document_type", "other")
-                    st.markdown(f"**Tipo:** {DOC_TYPE_LABELS.get(doc_type_raw, doc_type_raw)}")
+                    st.markdown(f"**Tipo:** {get_display_label(d)}")
                 with col_d3:
                     if st.button("Ver", key=f"view_assoc_pdf_{d.get('id')}", use_container_width=True):
                         st.session_state["viewing_pdf_id"] = d.get("id")
                         st.rerun()
+                with col_d4:
+                    if st.button("Eliminar", key=f"delete_assoc_doc_{d.get('id')}", use_container_width=True):
+                        confirm_delete_document(d.get("id"), display_name, p["id"])
                 st.divider()
                 
             viewing_id = st.session_state.get("viewing_pdf_id")

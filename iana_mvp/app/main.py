@@ -134,6 +134,7 @@ async def upload_pdf(
     file: UploadFile = File(...),
     project_id: str = Form(None),
     document_type: str = Form("other"),
+    observaciones: str = Form(""),
     current_user: dict = Depends(get_current_user)
 ) -> JSONResponse:
     job_id = str(uuid.uuid4())
@@ -184,53 +185,61 @@ async def upload_pdf(
 
     eval_dict = None
     if project_id:
-        try:
-            print(f"Iniciando análisis individual de documento '{file.filename}' (Tipo: {document_type})...")
-            doc_analysis = evaluate_document_individually(plan_text, document_type, OGUC_CONTENT)
-            
-            if upload_res and upload_res.get("success") and "document" in upload_res:
-                doc_id = upload_res["document"].get("id")
-                if doc_id:
-                    try:
-                        save_document_analysis({
-                            "document_id": doc_id,
-                            "extracted_text_summary": doc_analysis.document_summary,
-                            "infractions": [inf.model_dump() for inf in doc_analysis.infractions],
-                            "metadata": doc_analysis.extracted_metadata
-                        }, current_user["token"])
-                        print(f"Análisis individual de documento guardado en DB.")
-                    except Exception as db_err:
-                        print(f"Error guardando análisis del documento en la DB: {db_err}")
-
-            print(f"Consolidando contexto incremental para el proyecto {project_id}...")
-            client = get_supabase_client(current_user["token"])
-            proj_res = client.table("projects").select("*").eq("id", project_id).execute()
-            if proj_res.data:
-                project = proj_res.data[0]
-                existing_context = project.get("consolidated_context", "") or "Proyecto inicializado sin documentos."
-                existing_infractions = project.get("consolidated_infractions", []) or []
-                
-                consolidated = consolidate_project_context(
-                    project_metadata=project,
-                    existing_context=existing_context,
-                    existing_infractions=existing_infractions,
-                    new_doc_analysis=doc_analysis,
-                    oguc_text=OGUC_CONTENT
-                )
-                
-                update_project_context_db(
-                    project_id=project_id,
-                    context_data={
-                        "consolidated_context": consolidated.consolidated_context,
-                        "consolidated_infractions": [inf.model_dump() for inf in consolidated.consolidated_infractions],
-                        "success_probability": consolidated.success_probability,
-                        "extracted_metadata": consolidated.extracted_metadata,
-                        "terrain_rol": consolidated.extracted_metadata.get("rol_terreno", project.get("terrain_rol")),
-                        "block": consolidated.extracted_metadata.get("manzana", project.get("block")),
-                        "lot": consolidated.extracted_metadata.get("lote", project.get("lot"))
-                    },
-                    jwt_token=current_user["token"]
-                )
+               client = get_supabase_client(current_user["token"])
+             proj_res = client.table("projects").select("*").eq("id", project_id).execute()
+             if proj_res.data:
+                 project = proj_res.data[0]
+                 
+                 print(f"Iniciando análisis individual de documento '{file.filename}' (Tipo: {document_type})...")
+                 doc_analysis = evaluate_document_individually(
+                     doc_text=plan_text,
+                     doc_type=document_type,
+                     oguc_text=OGUC_CONTENT,
+                     observaciones=observaciones
+                 )
+                 
+                 if upload_res and upload_res.get("success") and "document" in upload_res:
+                     doc_id = upload_res["document"].get("id")
+                     if doc_id:
+                         try:
+                             save_document_analysis({
+                                 "document_id": doc_id,
+                                 "extracted_text_summary": doc_analysis.document_summary,
+                                 "infractions": [inf.model_dump() for inf in doc_analysis.infractions],
+                                 "metadata": {
+                                     **doc_analysis.extracted_metadata,
+                                     "observations": observaciones.strip()
+                                 }
+                             }, current_user["token"])
+                             print(f"Análisis individual de documento guardado en DB.")
+                         except Exception as db_err:
+                             print(f"Error guardando análisis del documento en la DB: {db_err}")
+ 
+                 print(f"Consolidando contexto incremental para el proyecto {project_id}...")
+                 existing_context = project.get("consolidated_context", "") or "Proyecto inicializado sin documentos."
+                 existing_infractions = project.get("consolidated_infractions", []) or []
+                 
+                 consolidated = consolidate_project_context(
+                     project_metadata=project,
+                     existing_context=existing_context,
+                     existing_infractions=existing_infractions,
+                     new_doc_analysis=doc_analysis,
+                     oguc_text=OGUC_CONTENT
+                 )
+                 
+                 update_project_context_db(
+                     project_id=project_id,
+                     context_data={
+                         "consolidated_context": consolidated.consolidated_context,
+                         "consolidated_infractions": [inf.model_dump() for inf in consolidated.consolidated_infractions],
+                         "success_probability": consolidated.success_probability,
+                         "extracted_metadata": consolidated.extracted_metadata,
+                         "terrain_rol": consolidated.extracted_metadata.get("rol_terreno", project.get("terrain_rol")),
+                         "block": consolidated.extracted_metadata.get("manzana", project.get("block")),
+                         "lot": consolidated.extracted_metadata.get("lote", project.get("lot"))
+                     },
+                     jwt_token=current_user["token"]
+                 )
                 
                 eval_dict = {
                     "project_name": project.get("name"),
@@ -245,7 +254,7 @@ async def upload_pdf(
 
     if not eval_dict:
         try:
-            evaluation = evaluate_project_with_ai(plan_text, OGUC_CONTENT)
+            evaluation = evaluate_project_with_ai(plan_text, OGUC_CONTENT, observaciones=observaciones)
             eval_dict = evaluation.model_dump()
         except Exception as e:
             print(f"Error evaluando el plano por IA: {e}")
@@ -272,6 +281,7 @@ async def upload_pdf(
         "success_probability": eval_dict.get("success_probability", 0.0),
         "infractions": eval_dict.get("infractions", []),
         "summary_notes": eval_dict.get("summary_notes", ""),
+        "observaciones": observaciones.strip()
     }
     
     out_json = os.path.join(RESULTS, f"{job_id}.json")
@@ -467,3 +477,30 @@ def api_create_project(req: ProjectCreateRequest, current_user: dict = Depends(g
 def api_list_projects(current_user: dict = Depends(get_current_user)):
     projects = list_user_projects(current_user["token"])
     return projects
+
+@app.delete("/api/documents/{doc_id}")
+def api_delete_document(doc_id: str, current_user: dict = Depends(get_current_user)):
+    from app.db import delete_project_document, get_supabase_client
+    from app.ai_verifier import rebuild_project_context
+    
+    client = get_supabase_client(current_user["token"])
+    doc_res = client.table("documents").select("*, projects(*)").eq("id", doc_id).execute()
+    if not doc_res.data:
+        raise HTTPException(status_code=404, detail="El documento no existe.")
+        
+    doc = doc_res.data[0]
+    project = doc.get("projects")
+    if not project or project.get("user_id") != current_user["user"].id:
+        raise HTTPException(status_code=403, detail="No tienes autorización para eliminar este documento.")
+        
+    project_id = doc["project_id"]
+    
+    del_res = delete_project_document(doc_id, current_user["token"])
+    if not del_res["success"]:
+        return JSONResponse({"error": del_res["error"]}, status_code=400)
+        
+    rebuild_res = rebuild_project_context(project_id, current_user["token"], OGUC_CONTENT)
+    if not rebuild_res["success"]:
+        return JSONResponse({"error": rebuild_res["error"]}, status_code=500)
+        
+    return {"success": True, "message": "Documento eliminado y contexto de proyecto reconstruido con éxito."}
