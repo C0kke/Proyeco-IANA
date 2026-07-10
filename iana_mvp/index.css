@@ -18,15 +18,20 @@
 /* Tipografía y Cuerpo General */
 html,
 body,
-[class*="css"],
 .stMarkdown,
 p,
-div,
-span,
 label,
 input,
 select,
 textarea {
+    font-family: var(--font-text);
+}
+
+.stButton button,
+.stSelectbox div,
+.stTextInput input,
+.stTextArea textarea,
+.stNumberInput input {
     font-family: var(--font-text) !important;
 }
 
