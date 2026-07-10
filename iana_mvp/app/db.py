@@ -293,6 +293,35 @@ def delete_project_document(doc_id: str, jwt_token: str) -> Dict[str, Any]:
         logger.error(f"Error al eliminar documento: {e}")
         return {"success": False, "error": str(e)}
 
+def delete_project(project_id: str, jwt_token: str) -> Dict[str, Any]:
+    client = get_supabase_client(jwt_token)
+    try:
+        docs_res = client.table("documents").select("bucket_path").eq("project_id", project_id).execute()
+        docs = docs_res.data or []
+        
+        for doc in docs:
+            bucket_path = doc.get("bucket_path", "")
+            if bucket_path:
+                if bucket_path.startswith("local://fallback/"):
+                    filename = os.path.basename(bucket_path.replace("local://fallback/", ""))
+                    local_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "uploads", "fallback", filename)
+                    if os.path.exists(local_path):
+                        try:
+                            os.remove(local_path)
+                        except Exception as fs_err:
+                            logger.error(f"Error borrando archivo local de fallback en delete_project: {fs_err}")
+                else:
+                    try:
+                        client.storage.from_("project-documents").remove([bucket_path])
+                    except Exception as storage_err:
+                        logger.error(f"Error al borrar del storage remoto en delete_project: {storage_err}")
+                        
+        client.table("projects").delete().eq("id", project_id).execute()
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error al eliminar proyecto: {e}")
+        return {"success": False, "error": str(e)}
+
 def get_document_file_bytes(doc: dict, jwt_token: str) -> bytes | None:
     bucket_path = doc.get("bucket_path", "")
     if not bucket_path:

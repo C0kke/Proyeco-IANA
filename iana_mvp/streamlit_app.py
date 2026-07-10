@@ -39,6 +39,7 @@ st.session_state.setdefault("history_cache", None)
 st.session_state.setdefault("viewing_pdf_id", None)
 st.session_state.setdefault("cookie_to_set", None)
 st.session_state.setdefault("cookie_to_clear", False)
+st.session_state.setdefault("logged_out", False)
 
 if "chile_tz" not in st.session_state:
     try:
@@ -97,7 +98,7 @@ if st.session_state["cookie_to_clear"]:
     st.session_state["cookie_to_clear"] = False
 
 cookie_token = st.context.cookies.get("session_token")
-if st.session_state["user"] is None and cookie_token:
+if st.session_state["user"] is None and cookie_token and not st.session_state["logged_out"]:
     res = verify_jwt_session(cookie_token)
     if res["success"]:
         st.session_state["user"] = res["user"]

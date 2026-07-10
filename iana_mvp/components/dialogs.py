@@ -292,3 +292,28 @@ def confirm_delete_document(doc_id: str, doc_name: str, project_id: str, oguc_co
     with col_c2:
         if st.button("Cancelar", use_container_width=True):
             st.rerun()
+
+@st.dialog("Eliminar Proyecto")
+def render_delete_project_modal(project_id: str, project_name: str):
+    st.write(f"¿Seguro que deseas eliminar el proyecto **{project_name}**?")
+    st.write("Esta acción es irreversible y se perderán todos los documentos y datos guardados asociados.")
+    st.write("")
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        if st.button("Sí, Eliminar", type="primary", use_container_width=True, key="confirm_delete_project_btn"):
+            with st.spinner("Eliminando proyecto..."):
+                from app.db import delete_project
+                res = delete_project(project_id, st.session_state["jwt_token"])
+                if res["success"]:
+                    st.success("Proyecto eliminado con éxito.")
+                    st.session_state["projects"] = list_user_projects(st.session_state["jwt_token"])
+                    st.session_state["active_project"] = None
+                    st.session_state["docs_cache"] = None
+                    st.session_state["history_cache"] = None
+                    st.session_state["viewing_pdf_id"] = None
+                    st.rerun()
+                else:
+                    st.error(f"Error al eliminar proyecto: {res['error']}")
+    with col_c2:
+        if st.button("Cancelar", use_container_width=True, key="cancel_delete_project_btn"):
+            st.rerun()

@@ -19,7 +19,7 @@ from app.ai_verifier import (
     consolidate_project_context
 )
 from app.report import render_html_report, render_pdf_report
-from components.dialogs import render_edit_project_modal, confirm_delete_document
+from components.dialogs import render_edit_project_modal, confirm_delete_document, render_delete_project_modal
 
 def is_duplicate_or_copy_name(name1: str, name2: str) -> bool:
     """
@@ -195,6 +195,8 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
         st.write("")
         if st.button("Editar Proyecto", use_container_width=True):
             render_edit_project_modal()
+        if st.button("Eliminar Proyecto", use_container_width=True, key="delete_project_dashboard_btn"):
+            render_delete_project_modal(p["id"], p["name"])
             
     docs = st.session_state["docs_cache"] or []
     uploaded_types = {d["document_type"] for d in docs}
