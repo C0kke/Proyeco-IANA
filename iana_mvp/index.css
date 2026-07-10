@@ -1,0 +1,228 @@
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Outfit:wght@600;700;800&display=swap');
+
+:root {
+    /* Paleta Cromática ARQCR+3D */
+    --brand-grafito: #333333;
+    --brand-carbon: #4A4A4A;
+    --brand-acero: #7A7A7A;
+    --brand-plata: #BDBDBD;
+    --brand-oro: #B89B2C;
+    --brand-negro: #000000;
+    --brand-blanco: #FFFFFF;
+
+    /* Tipografías */
+    --font-text: 'Exo 2', sans-serif;
+    --font-logo: 'Outfit', sans-serif;
+}
+
+/* Tipografía y Cuerpo General */
+html,
+body,
+.stMarkdown,
+p,
+label,
+input,
+select,
+textarea {
+    font-family: var(--font-text);
+}
+
+.stButton button,
+.stSelectbox div,
+.stTextInput input,
+.stTextArea textarea,
+.stNumberInput input {
+    font-family: var(--font-text) !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: var(--font-logo) !important;
+    color: var(--brand-grafito) !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.5px;
+}
+
+/* Contenedor Principal y Bienvenida */
+.welcome-container {
+    text-align: center;
+    padding: 50px 30px;
+    max-width: 850px;
+    margin: 0 auto;
+    background: radial-gradient(circle at 10% 20%, rgba(241, 245, 249, 0.5) 0%, rgba(255, 255, 255, 0.9) 90%);
+    border-radius: 20px;
+    border: 1px solid var(--brand-plata);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+}
+
+.welcome-title {
+    font-size: 38px;
+    font-weight: 800;
+    color: var(--brand-grafito);
+    margin-bottom: 15px;
+    letter-spacing: -1px;
+    text-transform: uppercase;
+}
+
+.welcome-title::after {
+    content: '';
+    display: block;
+    width: 60px;
+    height: 4px;
+    background-color: var(--brand-oro);
+    margin: 15px auto 0 auto;
+    border-radius: 2px;
+}
+
+.welcome-subtitle {
+    font-size: 16px;
+    color: var(--brand-carbon);
+    margin-bottom: 40px;
+    line-height: 1.7;
+}
+
+/* Sidebar y Elementos de Navegación */
+.sidebar-title {
+    margin-top: -20px;
+    margin-bottom: 14px;
+    font-family: var(--font-logo) !important;
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--brand-oro) !important;
+}
+
+.user-badge {
+    background-color: var(--brand-grafito) !important;
+    color: var(--brand-oro) !important;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
+    margin-bottom: 16px;
+    border: 1px solid var(--brand-carbon) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Botones Streamlit Personalizados para ARQCR+3D */
+.stButton>button {
+    background-color: var(--brand-grafito) !important;
+    color: var(--brand-blanco) !important;
+    border: 1px solid var(--brand-acero) !important;
+    border-radius: 8px !important;
+    font-family: var(--font-text) !important;
+    font-weight: 500 !important;
+    padding: 8px 20px !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.stButton>button:hover {
+    background-color: var(--brand-oro) !important;
+    color: var(--brand-negro) !important;
+    border-color: var(--brand-oro) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 20px rgba(184, 155, 44, 0.3) !important;
+}
+
+/* Botón Primario (Destacado en Oro) */
+.stButton>button[kind="primary"] {
+    background-color: var(--brand-oro) !important;
+    color: var(--brand-negro) !important;
+    border: 1px solid var(--brand-oro) !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.5px;
+}
+
+.stButton>button[kind="primary"]:hover {
+    background-color: var(--brand-grafito) !important;
+    color: var(--brand-oro) !important;
+    border-color: var(--brand-oro) !important;
+    box-shadow: 0 8px 20px rgba(51, 51, 51, 0.25) !important;
+}
+
+/* Tarjetas de Opciones (Bienvenida) */
+.option-card {
+    background: var(--brand-blanco);
+    border: 1px solid var(--brand-plata);
+    border-radius: 16px;
+    padding: 30px 24px;
+    text-align: center;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    height: 100%;
+    margin-bottom: 20px;
+}
+
+.option-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--brand-oro);
+    box-shadow: 0 15px 30px -10px rgba(184, 155, 44, 0.2);
+}
+
+.option-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--brand-grafito);
+    margin-bottom: 10px;
+}
+
+.option-desc {
+    font-size: 14px;
+    color: var(--brand-carbon);
+    margin-bottom: 20px;
+    line-height: 1.5;
+    min-height: 60px;
+}
+
+/* Fichas y Contenedores del Proyecto */
+.project-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--brand-plata);
+    padding: 24px;
+    border-radius: 16px;
+    margin-bottom: 25px;
+    box-shadow: 0 10px 25px -10px rgba(0, 0, 0, 0.05);
+}
+
+.project-header {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--brand-grafito);
+    margin-bottom: 8px;
+}
+
+.project-meta {
+    font-size: 13px;
+    color: var(--brand-acero);
+    margin-bottom: 12px;
+}
+
+.metric-value {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--brand-oro);
+    font-family: var(--font-logo) !important;
+}
+
+/* Estilización de Inputs en Streamlit */
+div[data-baseweb="input"],
+div[data-baseweb="select"],
+div[data-baseweb="textarea"] {
+    border-radius: 8px !important;
+}
+
+div[data-baseweb="input"]:focus-within,
+div[data-baseweb="select"]:focus-within,
+div[data-baseweb="textarea"]:focus-within {
+    border-color: var(--brand-oro) !important;
+}

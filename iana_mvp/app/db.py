@@ -292,3 +292,27 @@ def delete_project_document(doc_id: str, jwt_token: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error al eliminar documento: {e}")
         return {"success": False, "error": str(e)}
+
+def get_document_file_bytes(doc: dict, jwt_token: str) -> bytes | None:
+    bucket_path = doc.get("bucket_path", "")
+    if not bucket_path:
+        return None
+        
+    if bucket_path.startswith("local://fallback/"):
+        filename = os.path.basename(bucket_path.replace("local://fallback/", ""))
+        local_path = os.path.join(DATA_DIR, "uploads", "fallback", filename)
+        if os.path.exists(local_path):
+            try:
+                with open(local_path, "rb") as f:
+                    return f.read()
+            except OSError as err:
+                logger.error(f"Error al leer archivo local de fallback: {err}")
+    else:
+        try:
+            client = get_supabase_client(jwt_token)
+            res = client.storage.from_("project-documents").download(bucket_path)
+            return res
+        except Exception as e:
+            logger.error(f"Error al descargar archivo desde Supabase Storage: {e}")
+            
+    return None
