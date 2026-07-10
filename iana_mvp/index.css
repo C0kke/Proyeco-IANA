@@ -47,12 +47,11 @@ h6 {
     letter-spacing: -0.5px;
 }
 
-/* Contenedor Principal y Bienvenida */
 .welcome-container {
     text-align: center;
     padding: 50px 30px;
     max-width: 850px;
-    margin: 0 auto;
+    margin: 0 auto 64px auto;
     background: radial-gradient(circle at 10% 20%, rgba(241, 245, 249, 0.5) 0%, rgba(255, 255, 255, 0.9) 90%);
     border-radius: 20px;
     border: 1px solid var(--brand-plata);
@@ -85,10 +84,7 @@ h6 {
     line-height: 1.7;
 }
 
-/* Sidebar y Elementos de Navegación */
 .sidebar-title {
-    margin-top: -20px;
-    margin-bottom: 14px;
     font-family: var(--font-logo) !important;
     font-size: 14px;
     font-weight: 800;
@@ -98,20 +94,17 @@ h6 {
 }
 
 .user-badge {
-    background-color: var(--brand-grafito) !important;
+    background-color: transparent !important;
     color: var(--brand-oro) !important;
-    padding: 6px 12px;
-    border-radius: 8px;
+    padding: 0px !important;
     font-size: 11px;
     font-weight: 700;
     display: inline-block;
-    margin-bottom: 16px;
-    border: 1px solid var(--brand-carbon) !important;
+    border: none !important;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
-/* Botones Streamlit Personalizados para ARQCR+3D */
 .stButton>button {
     background-color: var(--brand-grafito) !important;
     color: var(--brand-blanco) !important;
@@ -132,7 +125,6 @@ h6 {
     box-shadow: 0 8px 20px rgba(184, 155, 44, 0.3) !important;
 }
 
-/* Botón Primario (Destacado en Oro) */
 .stButton>button[kind="primary"] {
     background-color: var(--brand-oro) !important;
     color: var(--brand-negro) !important;
@@ -148,7 +140,6 @@ h6 {
     box-shadow: 0 8px 20px rgba(51, 51, 51, 0.25) !important;
 }
 
-/* Tarjetas de Opciones (Bienvenida) */
 .option-card {
     background: var(--brand-blanco);
     border: 1px solid var(--brand-plata);
@@ -182,7 +173,6 @@ h6 {
     min-height: 60px;
 }
 
-/* Fichas y Contenedores del Proyecto */
 .project-card {
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(12px);
@@ -214,7 +204,6 @@ h6 {
     font-family: var(--font-logo) !important;
 }
 
-/* Estilización de Inputs en Streamlit */
 div[data-baseweb="input"],
 div[data-baseweb="select"],
 div[data-baseweb="textarea"] {
@@ -225,4 +214,43 @@ div[data-baseweb="input"]:focus-within,
 div[data-baseweb="select"]:focus-within,
 div[data-baseweb="textarea"]:focus-within {
     border-color: var(--brand-oro) !important;
+}
+
+.sidebar-user-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--brand-negro) !important;
+}
+
+section[data-testid="stSidebar"]>div {
+    overflow: hidden !important;
+}
+
+[data-testid="stSidebar"] {
+    overflow: hidden !important;
+}
+
+[data-testid="stSidebarUserContent"] {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - 20px) !important;
+    overflow: hidden !important;
+}
+
+.sidebar-bottom-spacer {
+    margin-top: auto !important;
+}
+
+.sidebar-version {
+    font-size: 11px;
+    color: #94a3b8;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.stSidebar button p {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
 }
