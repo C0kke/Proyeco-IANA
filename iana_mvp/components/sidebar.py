@@ -58,6 +58,7 @@ def render_sidebar():
         st.session_state["jwt_token"] = None
         st.session_state["active_project"] = None
         st.session_state["projects"] = []
+        st.session_state["projects_loaded"] = False
         st.session_state["cookie_to_clear"] = True
         st.session_state["logged_out"] = True
         st.rerun()

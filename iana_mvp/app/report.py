@@ -385,15 +385,21 @@ PDF_TMPL = Template(
 
 def get_status_label(result: Dict[str, Any]) -> str:
     is_valid = result.get("is_valid", True)
+    infractions = result.get("infractions", [])
+    has_high_severity = any(inf.get("severity") == "ALTA" for inf in infractions)
     success_probability = result.get("success_probability", 0.0)
     
     if not is_valid:
         return "Rechazado (No Válido)"
-    if success_probability < 40.0:
+    elif has_high_severity:
         return "Rechazado"
-    elif success_probability < 75.0:
+    elif success_probability < 50.0:
+        return "Rechazado"
+    elif success_probability < 80.0:
         return "Reformular"
     elif success_probability < 95.0:
+        return "Posible Aprobación"
+    elif infractions:
         return "Aprobado con obs."
     else:
         return "Aprobado"

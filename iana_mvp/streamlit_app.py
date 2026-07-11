@@ -29,6 +29,7 @@ os.makedirs(RESULTS, exist_ok=True)
 st.session_state.setdefault("user", None)
 st.session_state.setdefault("jwt_token", None)
 st.session_state.setdefault("projects", [])
+st.session_state.setdefault("projects_loaded", False)
 st.session_state.setdefault("active_project", None)
 st.session_state.setdefault("search_cache", "")
 st.session_state.setdefault("limit", 10)
@@ -97,19 +98,50 @@ if st.session_state["cookie_to_clear"]:
     clear_session_cookie()
     st.session_state["cookie_to_clear"] = False
 
+def is_jwt_expired(jwt_token: str) -> bool:
+    import base64
+    import json
+    import time
+    try:
+        access_token = jwt_token.split(":::")[0] if ":::" in jwt_token else jwt_token
+        parts = access_token.split(".")
+        if len(parts) < 2:
+            return True
+        payload_b64 = parts[1]
+        payload_b64 += "=" * ((4 - len(payload_b64) % 4) % 4)
+        payload_json = base64.b64decode(payload_b64).decode("utf-8")
+        payload = json.loads(payload_json)
+        exp = payload.get("exp", 0)
+        return exp < (time.time() + 300)
+    except Exception:
+        return True
+
 cookie_token = st.context.cookies.get("session_token")
-if st.session_state["user"] is None and cookie_token and not st.session_state["logged_out"]:
+should_verify = False
+if cookie_token and not st.session_state["logged_out"]:
+    if st.session_state["user"] is None:
+        should_verify = True
+    elif st.session_state["jwt_token"] and is_jwt_expired(st.session_state["jwt_token"]):
+        should_verify = True
+
+if should_verify:
     res = verify_jwt_session(cookie_token)
     if res["success"]:
         st.session_state["user"] = res["user"]
         st.session_state["jwt_token"] = res["jwt_token"]
         if res.get("refreshed"):
             st.session_state["cookie_to_set"] = res["jwt_token"]
-        try:
-            st.session_state["projects"] = list_user_projects(res["jwt_token"])
-            st.session_state["active_project"] = None
-        except Exception as e:
-            print(f"Error al restaurar proyectos tras recarga: {e}")
+        
+        if not st.session_state.get("projects_loaded") or res.get("refreshed"):
+            try:
+                st.session_state["projects"] = list_user_projects(res["jwt_token"])
+                st.session_state["projects_loaded"] = True
+            except Exception as e:
+                print(f"Error al restaurar proyectos tras recarga: {e}")
+    else:
+        st.session_state["user"] = None
+        st.session_state["jwt_token"] = None
+        st.session_state["cookie_to_clear"] = True
 
 styles_path = os.path.join(os.path.dirname(__file__), "index.css")
 if os.path.exists(styles_path):

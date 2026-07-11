@@ -15,10 +15,14 @@ api_key = os.getenv("GEMINI_API_KEY")
 
 try:
     genai_client = genai.Client(api_key=api_key) if api_key else genai.Client()
-    client = instructor.from_genai(genai_client)
+    client = instructor.from_genai(genai_client, mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS)
 except Exception as e:
     client = None
     print(f"Error inicializando el cliente Gemini: {e}")
+
+class MetadataItem(BaseModel):
+    key: str = Field(description="Nombre del parámetro (ej: 'rol_terreno', 'superficie', 'altura_maxima', 'manzana', 'lote', 'comuna', 'region', 'destino_edificacion')")
+    value: str = Field(description="Valor del parámetro (ej: '123-45', '450m2', '12 metros', 'Santiago', etc.)")
 
 class Infraction(BaseModel):
     rule_id: str = Field(
@@ -65,9 +69,9 @@ class DocumentSpecificAnalysis(BaseModel):
     infractions: List[Infraction] = Field(
         description="Lista de infracciones o incumplimientos de la OGUC encontrados *únicamente* en este archivo. Si no hay, debe ser []"
     )
-    extracted_metadata: Dict[str, str] = Field(
-        default_factory=dict,
-        description="Diccionario de parámetros clave-valor importantes extraídos (ej. 'rol_terreno', 'superficie', 'altura_maxima', 'manzana', 'lote', 'comuna', 'region', 'destino_edificacion')."
+    extracted_metadata: List[MetadataItem] = Field(
+        default_factory=list,
+        description="Lista de parámetros catastrales y normativos clave extraídos."
     )
 
 
@@ -85,8 +89,9 @@ class ConsolidatedProjectEvaluation(BaseModel):
     success_probability: float = Field(
         description="Probabilidad global de viabilidad normativa del proyecto (0.0 a 100.0) basada en todos los documentos cargados hasta el momento."
     )
-    extracted_metadata: Dict[str, str] = Field(
-        description="Diccionario consolidado que unifica todos los parámetros catastrales y normativos acumulados del proyecto."
+    extracted_metadata: List[MetadataItem] = Field(
+        default_factory=list,
+        description="Lista consolidada que unifica todos los parámetros catastrales y normativos acumulados del proyecto."
     )
 
 def retrieve_relevant_oguc_content(plan_text: str, oguc_text: str, max_tokens_budget: int = 40000) -> str:
@@ -187,30 +192,32 @@ def evaluate_document_individually(
     doc_text: str, 
     doc_type: str, 
     oguc_text: str,
-    observaciones: str = ""
+    observaciones: str = "",
+    pdf_path: Optional[str] = None
 ) -> DocumentSpecificAnalysis:
     """
     Realiza un análisis individual de un documento específico de acuerdo a su tipo
     (CIP, ETT, site_plan, etc.). Extrae variables, parámetros y alertas locales de la OGUC.
+    Soporta análisis visual de planos adjuntando imágenes de páginas de PDF al prompt de Gemini.
     """
     if not client:
         raise ValueError("El cliente de Gemini/Instructor no está inicializado.")
 
     relevant_oguc = retrieve_relevant_oguc_content(doc_text, oguc_text, max_tokens_budget=30000)
 
-    prompt = (
+    prompt_text = (
         "Actúa como un revisor normativo experto en edificación de Chile.\n"
         f"Analiza este documento de tipo: '{doc_type}' contra los artículos relevantes de la OGUC.\n\n"
     )
     if observaciones:
-        prompt += (
+        prompt_text += (
             "--- CONTEXTO/OBSERVACIONES DEL PROYECTISTA PARA ESTE DOCUMENTO ---\n"
             f"{observaciones}\n\n"
         )
-    prompt += (
+    prompt_text += (
         "--- LEY OFICIAL (OGUC CHILE) ---\n"
         f"{relevant_oguc}\n\n"
-        "--- CONTENIDO DEL ARCHIVO ---\n"
+        "--- CONTENIDO DE TEXTO EXTRAÍDO DEL ARCHIVO ---\n"
         f"{doc_text}\n\n"
         "Tu tarea consiste en:\n"
         "1. Generar un resumen técnico del contenido del archivo.\n"
@@ -220,10 +227,38 @@ def evaluate_document_individually(
         "4. Determinar si el documento tiene relación directa con arquitectura, edificación, construcción, planos, ETT, CIP, etc. Si el documento trata de informática, software, cocina, literatura, u otro tema no constructivo, debes marcar is_valid_architectural_doc = False; de lo contrario, True.\n"
     )
 
+    content_list = [prompt_text]
+
+    if pdf_path and os.path.exists(pdf_path) and doc_type in ["site_plan", "sections", "elevations", "cuts"]:
+        try:
+            import fitz
+            from PIL import Image
+            import io
+            doc = fitz.open(pdf_path)
+            max_pages = min(len(doc), 3)
+            for page_num in range(max_pages):
+                page = doc.load_page(page_num)
+                pix = page.get_pixmap(dpi=120)
+                img_data = pix.tobytes("png")
+                img = Image.open(io.BytesIO(img_data))
+                content_list.append(img)
+            
+            # Avisar a la IA que examine las imágenes
+            prompt_text += (
+                "\n--- ENTRADA MULTIMODAL (IMÁGENES DEL PLANO ADJUNTAS) ---\n"
+                "Hemos renderizado y adjuntado las páginas de este plano como imágenes de alta resolución. "
+                "Debes analizarlas visualmente con extremo cuidado. Coteja las elevaciones, dibujos de cortes, "
+                "líneas, alturas de edificación, distanciamientos y rasantes representados gráficamente, "
+                "ya que la extracción de texto plana puede omitir detalles visuales críticos o cotas numéricas del dibujo."
+            )
+            content_list[0] = prompt_text
+        except Exception as img_err:
+            print(f"Advertencia al renderizar imágenes del PDF para la IA: {img_err}")
+
     response: DocumentSpecificAnalysis = client.chat.completions.create(
         model="gemini-2.5-flash",
         response_model=DocumentSpecificAnalysis,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": content_list}],
     )
     return response
 
@@ -266,6 +301,7 @@ def consolidate_project_context(
             f"{observations}\n\n"
         )
         
+    new_doc_meta_dict = {item.key: item.value for item in new_doc_analysis.extracted_metadata}
     prompt += (
         "--- CONTEXTO ACUMULADO PREVIO ---\n"
         f"{existing_context}\n\n"
@@ -274,14 +310,17 @@ def consolidate_project_context(
         "--- NUEVO DOCUMENTO INCORPORADO ---\n"
         f"Resumen técnico del nuevo archivo: {new_doc_analysis.document_summary}\n"
         f"Infracciones reportadas por el nuevo archivo: {new_doc_infractions_str}\n"
-        f"Metadatos extraídos de este archivo: {json.dumps(new_doc_analysis.extracted_metadata, ensure_ascii=False)}\n\n"
+        f"Metadatos extraídos de este archivo: {json.dumps(new_doc_meta_dict, ensure_ascii=False)}\n\n"
         "--- INSTRUCCIONES ---\n"
         "1. **Actualiza el Contexto Acumulado:** Redacta un texto fluido que integre los nuevos detalles (ej: si el nuevo documento es un plano de cortes y antes solo teníamos la ETT).\n"
         "2. **Resuelve Infracciones Previas:** Analiza si los nuevos datos o el nuevo plano justifican/sanan alguna alerta anterior. Si es así, elimínala de las infracciones consolidadas.\n"
         "3. **Agrega Nuevas Infracciones:** Si el nuevo documento contiene nuevas fallas normativas que no estaban documentadas, agrégalas a la lista.\n"
         "4. **Combina Metadatos:** Unifica los metadatos anteriores con los del nuevo archivo.\n"
-        "5. **Estima la Viabilidad:** Recalcula el porcentaje de éxito (0.0 a 100.0) de aprobación final municipal. Si is_valid_project_documentation es False, la viabilidad debe ser 0.0.\n"
+        "5. **Estima la Viabilidad y Justifica:** Recalcula el porcentaje de éxito (0.0 a 100.0) de aprobación final municipal. Si is_valid_project_documentation es False, la viabilidad debe ser 0.0. "
+        "Cualquier penalización que deje la viabilidad por debajo del 95% debe estar estrictamente justificada por infracciones en la lista. Si penalizas la viabilidad porque el proyecto aún está incompleto (ej. solo se ha subido el CIP pero faltan los planos de arquitectura o elevaciones indispensables), debes añadir obligatoriamente alertas correspondientes a la lista de infracciones (ej: rule_id='Expediente Incompleto', description='Falta cargar el plano de arquitectura para verificar coeficiente de constructibilidad y alturas', severity='MEDIA' o 'BAJA'). Si el expediente está completo y no hay infracciones detectadas, la viabilidad debe ser del 100%.\n"
         "6. **Valida la Documentación del Proyecto:** Si el nuevo documento tiene is_valid_architectural_doc = False o no tiene relación alguna con edificación/construcción de viviendas, debes marcar is_valid_project_documentation = False; de lo contrario, True.\n"
+        "7. **También señala puntos buenos en tu análisis, reduciendo la información general del proyecto a una sola linea, dando pie a tener un análisis mayor. \n"
+        "8. **Finalmente añade un pequeño punteo sobre qué normas importantes o que la DOM suele aprobar o rechazar más está contemplado en el contexto. \n"
     )
 
     response: ConsolidatedProjectEvaluation = client.chat.completions.create(
@@ -331,11 +370,19 @@ def rebuild_project_context(project_id: str, jwt_token: str, oguc_text: str) -> 
                 continue
                 
             analysis_data = analyses[0]
+            db_metadata = analysis_data.get("metadata") or {}
+            
+            meta_list = [
+                MetadataItem(key=k, value=str(v))
+                for k, v in db_metadata.items()
+                if k not in ["is_valid", "observations"]
+            ]
+            
             doc_analysis = DocumentSpecificAnalysis(
                 document_summary=analysis_data.get("extracted_text_summary", ""),
-                is_valid_architectural_doc=analysis_data.get("metadata", {}).get("is_valid", True),
+                is_valid_architectural_doc=db_metadata.get("is_valid", True),
                 infractions=[Infraction(**inf) for inf in (analysis_data.get("infractions") or [])],
-                extracted_metadata=analysis_data.get("metadata") or {}
+                extracted_metadata=meta_list
             )
             
             consolidated = consolidate_project_context(
@@ -348,11 +395,13 @@ def rebuild_project_context(project_id: str, jwt_token: str, oguc_text: str) -> 
             
             consolidated_context = consolidated.consolidated_context
             consolidated_infractions = [inf.model_dump() for inf in consolidated.consolidated_infractions]
-            current_meta = {**current_meta, **consolidated.extracted_metadata}
+            
+            consolidated_meta_dict = {item.key: item.value for item in consolidated.extracted_metadata}
+            current_meta = {**current_meta, **consolidated_meta_dict}
             current_meta["is_valid"] = consolidated.is_valid_project_documentation
             last_success_probability = consolidated.success_probability
             
-            obs = doc_analysis.extracted_metadata.get("observations", "")
+            obs = db_metadata.get("observations", "")
             if obs:
                 current_meta["observations"] = obs
                 
