@@ -39,7 +39,8 @@ def render_auth_page():
                             st.session_state["logged_out"] = False
                             st.success("¡Sesión iniciada con éxito!")
                             st.session_state["projects"] = list_user_projects(res["jwt_token"])
-                            st.session_state["active_project"] = None  # Landing page on login
+                            st.session_state["projects_loaded"] = True
+                            st.session_state["active_project"] = None
                             st.rerun()
                         else:
                             st.error(f"Error de credenciales: {res['error']}")

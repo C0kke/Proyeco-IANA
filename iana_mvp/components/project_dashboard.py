@@ -92,11 +92,18 @@ def display_results(result_data):
     is_valid = result_data.get("is_valid", True)
     infractions = result_data.get("infractions", [])
     has_high_severity = any(inf.get("severity") == "ALTA" for inf in infractions)
+    prob = result_data.get("success_probability", 100.0)
     
     if not is_valid:
         status_value = "Rechazado (No Válido)"
     elif has_high_severity:
         status_value = "Rechazado"
+    elif prob < 50.0:
+        status_value = "Rechazado"
+    elif prob < 80.0:
+        status_value = "Reformular"
+    elif prob < 95.0:
+        status_value = "Posible Aprobación"
     elif infractions:
         status_value = "Aprobado con obs."
     else:
@@ -207,9 +214,11 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
     if "sections" not in uploaded_types:
         missing_docs.append("Plano de arquitectura")
     if "elevations" not in uploaded_types:
-        missing_docs.append("Elevaciones / cortes")
+        missing_docs.append("Plano de elevaciones")
+    if "cuts" not in uploaded_types:
+        missing_docs.append("Plano de cortes")
     if "ett" not in uploaded_types:
-        missing_docs.append("Techumbre")
+        missing_docs.append("Especificaciones Técnicas (ETT)")
         
     if missing_docs:
         missing_str = ", ".join(missing_docs)
@@ -257,7 +266,8 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                         "ett": "ETT",
                         "site_plan": "Emplazamiento",
                         "sections": "Arquitectura",
-                        "elevations": "Elevaciones/Cortes",
+                        "elevations": "Elevaciones",
+                        "cuts": "Cortes",
                         "other": "Otro"
                     }
                     dtype_label = labels.get(dtype, dtype)
@@ -277,13 +287,14 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
         
         doc_type = st.selectbox(
             "Tipo de Documento a Subir",
-            options=["cip", "ett", "site_plan", "sections", "elevations", "techumbre", "other"],
+            options=["cip", "ett", "site_plan", "sections", "elevations", "cuts", "techumbre", "other"],
             format_func=lambda x: {
                 "cip": "Certificado de Informaciones Previas (CIP)",
                 "ett": "Especificaciones Técnicas (ETT)",
                 "site_plan": "Plano de emplazamiento",
                 "sections": "Plano de arquitectura",
-                "elevations": "Elevaciones / cortes",
+                "elevations": "Plano de elevaciones",
+                "cuts": "Plano de cortes",
                 "techumbre": "Techumbre",
                 "other": "Otro documento"
             }[x]
@@ -297,7 +308,6 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
         )
         
         active_job_id = st.query_params.get("job_id")
-        
         p_obs = st.text_area(
             "Observaciones / Contexto Adicional para este Documento",
             value="",
@@ -305,7 +315,31 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
             help="Estas observaciones se enviarán a la IA para guiar la revisión."
         )
         
-        if uploaded_file is not None:
+        if uploaded_file is None:
+            if not docs_list:
+                st.warning("No has seleccionado ningún archivo para validar. Sube al menos un plano o especificación técnica en el selector de arriba.")
+                confirm_empty = st.checkbox("Confirmar validación vacía sin archivos", value=False)
+                if st.button("Iniciar Validación Normativa con IA", type="primary", use_container_width=True, disabled=not confirm_empty):
+                    st.info("No hay documentos en el proyecto para validar. Por favor, sube un documento primero para iniciar el análisis.")
+            else:
+                st.info("No has seleccionado un archivo nuevo. Al iniciar la validación, se re-evaluará el proyecto completo usando los documentos cargados actualmente en el contexto.")
+                if st.button("Iniciar Validación Normativa con IA (Re-evaluar Contexto)", type="primary", use_container_width=True):
+                    with st.spinner("Re-evaluando y reconstruyendo contexto histórico del proyecto..."):
+                        from app.ai_verifier import rebuild_project_context
+                        rebuild_res = rebuild_project_context(p["id"], st.session_state["jwt_token"], oguc_content)
+                        if rebuild_res["success"]:
+                            st.success("Re-evaluación completada con éxito.")
+                            st.session_state["projects"] = list_user_projects(st.session_state["jwt_token"])
+                            for updated_p in st.session_state["projects"]:
+                                if updated_p["id"] == p["id"]:
+                                    st.session_state["active_project"] = updated_p
+                                    break
+                            st.session_state["docs_cache"] = None
+                            st.session_state["history_cache"] = None
+                            st.rerun()
+                        else:
+                            st.error(f"Error al reconstruir el contexto: {rebuild_res['error']}")
+        else:
             st.info(f"Archivo listo: **{uploaded_file.name}** ({uploaded_file.size / 1024:.2f} KB)")
             
             duplicate_doc = None
@@ -332,34 +366,10 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                 pdf_path = os.path.join(uploads_dir, f"{job_id}{ext}")
                 
                 try:
-                    with st.spinner("Procesando y almacenando archivo en Storage..."):
-                        file_bytes = uploaded_file.getvalue()
-                        
-                        db_doc_type = doc_type
-                        display_filename = uploaded_file.name
-                        if doc_type == "techumbre":
-                            db_doc_type = "other"
-                            display_filename = f"[Techumbre] {uploaded_file.name}"
-                        elif doc_type == "other":
-                            display_filename = f"[Otro] {uploaded_file.name}"
-                        
-                        db_res = upload_project_document(
-                            user_id=st.session_state["user"].id,
-                            project_id=p["id"],
-                            file_name=display_filename,
-                            file_bytes=file_bytes,
-                            document_type=db_doc_type,
-                            jwt_token=st.session_state["jwt_token"]
-                        )
-                        
-                        with open(pdf_path, "wb") as handle:
-                            handle.write(file_bytes)
-                            
-                        if db_res.get("storage_location") == "local_fallback":
-                            st.warning("No se pudo conectar con el storage remoto. El archivo se guardó localmente en modo fallback de emergencia y el análisis continuará normalmente.")
-                        else:
-                            st.success("Archivo guardado y respaldado en Supabase Storage con políticas RLS de seguridad.")
-
+                    file_bytes = uploaded_file.getvalue()
+                    with open(pdf_path, "wb") as handle:
+                        handle.write(file_bytes)
+                    
                     with st.spinner("Extrayendo texto del archivo..."):
                         from app.pdf_extract import extract_text_blocks
                         blocks = extract_text_blocks(pdf_path)
@@ -373,64 +383,87 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                             doc_text=plan_text,
                             doc_type=doc_type,
                             oguc_text=oguc_content,
-                            observaciones=p_obs.strip()
+                            observaciones=p_obs.strip(),
+                            pdf_path=pdf_path
                         )
                         
-                        if db_res.get("success") and "document" in db_res:
-                            doc_id = db_res["document"].get("id")
-                            if doc_id:
-                                try:
-                                    save_document_analysis({
-                                        "document_id": doc_id,
-                                        "extracted_text_summary": doc_analysis.document_summary,
-                                        "infractions": [inf.model_dump() for inf in doc_analysis.infractions],
-                                        "metadata": {
-                                            **doc_analysis.extracted_metadata,
-                                            "observations": p_obs.strip(),
-                                            "is_valid": doc_analysis.is_valid_architectural_doc
-                                        }
-                                    }, st.session_state["jwt_token"])
-                                except Exception as db_err:
-                                    st.warning(f"No se pudo guardar el análisis individual en la base de datos: {db_err}")
-
                     with st.spinner("Consolidando contexto histórico e integrando alertas..."):
-                        existing_context = p.get("consolidated_context", "") or "Proyecto inicializado."
-                        existing_infractions = p.get("consolidated_infractions", []) or []
-                        
                         consolidated = consolidate_project_context(
                             project_metadata=p,
-                            existing_context=existing_context,
-                            existing_infractions=existing_infractions,
+                            existing_context=p.get("consolidated_context", "Proyecto inicializado."),
+                            existing_infractions=p.get("consolidated_infractions") or [],
                             new_doc_analysis=doc_analysis,
-                            oguc_text=oguc_content
+                            oguc_text=oguc_content,
+                            observations=p_obs.strip()
                         )
                         
-                        update_res = update_project_context_db(
+                    with st.spinner("Guardando documento en el almacenamiento..."):
+                        db_doc_type = doc_type
+                        display_filename = uploaded_file.name
+                        if doc_type == "techumbre":
+                            db_doc_type = "other"
+                            display_filename = f"[Techumbre] {uploaded_file.name}"
+                        elif doc_type == "other":
+                            display_filename = f"[Otro] {uploaded_file.name}"
+                        
+                        from app.db import upload_project_document
+                        db_res = upload_project_document(
+                            user_id=st.session_state["user"].id,
                             project_id=p["id"],
-                            context_data={
-                                "consolidated_context": consolidated.consolidated_context,
-                                "consolidated_infractions": [inf.model_dump() for inf in consolidated.consolidated_infractions],
-                                "success_probability": consolidated.success_probability,
-                                "extracted_metadata": {
-                                    **consolidated.extracted_metadata,
-                                    "is_valid": consolidated.is_valid_project_documentation
-                                },
-                                "terrain_rol": consolidated.extracted_metadata.get("rol_terreno", p.get("terrain_rol")),
-                                "block": consolidated.extracted_metadata.get("manzana", p.get("block")),
-                                "lot": consolidated.extracted_metadata.get("lote", p.get("lote"))
-                            },
+                            file_name=display_filename,
+                            file_bytes=file_bytes,
+                            document_type=db_doc_type,
                             jwt_token=st.session_state["jwt_token"]
                         )
                         
-                        if update_res["success"]:
-                            st.session_state["projects"] = list_user_projects(st.session_state["jwt_token"])
-                            for updated_p in st.session_state["projects"]:
-                                if updated_p["id"] == p["id"]:
-                                    st.session_state["active_project"] = updated_p
-                                    break
-                        else:
-                            raise ValueError(f"Error al actualizar el contexto consolidado en la DB: {update_res['error']}")
+                        if not db_res.get("success"):
+                            raise ValueError(f"Error al subir el documento: {db_res.get('error', 'Desconocido')}")
                             
+                    doc_id = db_res["document"].get("id")
+                    if doc_id:
+                        try:
+                            from app.db import save_document_analysis
+                            save_document_analysis({
+                                "document_id": doc_id,
+                                "extracted_text_summary": doc_analysis.document_summary,
+                                "infractions": [inf.model_dump() for inf in doc_analysis.infractions],
+                                "metadata": {
+                                    **{item.key: item.value for item in doc_analysis.extracted_metadata},
+                                    "observations": p_obs.strip(),
+                                    "is_valid": doc_analysis.is_valid_architectural_doc
+                                }
+                            }, st.session_state["jwt_token"])
+                        except Exception as db_err:
+                            st.warning(f"No se pudo guardar el análisis individual en la base de datos: {db_err}")
+                            
+                    consolidated_meta_dict = {item.key: item.value for item in consolidated.extracted_metadata}
+                    from app.db import update_project_context_db
+                    update_res = update_project_context_db(
+                        project_id=p["id"],
+                        context_data={
+                            "consolidated_context": consolidated.consolidated_context,
+                            "consolidated_infractions": [inf.model_dump() for inf in consolidated.consolidated_infractions],
+                            "success_probability": consolidated.success_probability,
+                            "extracted_metadata": {
+                                **consolidated_meta_dict,
+                                "is_valid": consolidated.is_valid_project_documentation
+                            },
+                            "terrain_rol": consolidated_meta_dict.get("rol_terreno", p.get("terrain_rol")),
+                            "block": consolidated_meta_dict.get("manzana", p.get("block")),
+                            "lot": consolidated_meta_dict.get("lote", p.get("lote"))
+                        },
+                        jwt_token=st.session_state["jwt_token"]
+                    )
+                    
+                    if update_res["success"]:
+                        st.session_state["projects"] = list_user_projects(st.session_state["jwt_token"])
+                        for updated_p in st.session_state["projects"]:
+                            if updated_p["id"] == p["id"]:
+                                st.session_state["active_project"] = updated_p
+                                break
+                    else:
+                        raise ValueError(f"Error al actualizar el contexto consolidado en la DB: {update_res['error']}")
+
                     result_data = {
                         "job_id": job_id,
                         "user_id": st.session_state["user"].id,
@@ -452,6 +485,11 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                     with open(out_html, "w", encoding="utf-8") as handle:
                         handle.write(render_html_report(uploaded_file.name, result_data))
                         
+                    if db_res.get("storage_location") == "local_fallback":
+                        st.warning("No se pudo conectar con el storage remoto. El archivo se guardó localmente en modo fallback de emergencia y el análisis continuará normalmente.")
+                    else:
+                        st.success("Archivo guardado y respaldado en Supabase Storage con políticas RLS de seguridad.")
+                        
                     st.session_state["file_uploader_key"] = f"file_uploader_{uuid.uuid4()}"
                     st.session_state["docs_cache"] = None
                     st.session_state["history_cache"] = None
@@ -459,6 +497,11 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                     st.rerun()
                     
                 except Exception as e:
+                    if os.path.exists(pdf_path):
+                        try:
+                            os.remove(pdf_path)
+                        except Exception:
+                            pass
                     st.error(f"Ocurrió un error durante la validación: {e}")
                 
         if active_job_id:
@@ -496,7 +539,8 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                 "ett": "Especificaciones Técnicas (ETT)",
                 "site_plan": "Plano de emplazamiento",
                 "sections": "Plano de arquitectura",
-                "elevations": "Elevaciones / cortes"
+                "elevations": "Plano de elevaciones",
+                "cuts": "Plano de cortes"
             }
             return labels.get(dtype, dtype)
             
