@@ -13,6 +13,9 @@ load_dotenv()
 
 api_key = os.getenv("GEMINI_API_KEY")
 
+# DEFAULT_MODEL = "gemini-2.5-flash"
+0DEFAULT_MODEL = "gemini-3.1-flash-lite"
+
 try:
     genai_client = genai.Client(api_key=api_key) if api_key else genai.Client()
     client = instructor.from_genai(genai_client, mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS)
@@ -181,7 +184,7 @@ def evaluate_project_with_ai(plan_text: str, oguc_text: str, observaciones: str 
     )
 
     response: ProjectEvaluation = client.chat.completions.create(
-        model="gemini-2.5-flash",
+        model=DEFAULT_MODEL,
         response_model=ProjectEvaluation,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -256,7 +259,7 @@ def evaluate_document_individually(
             print(f"Advertencia al renderizar imágenes del PDF para la IA: {img_err}")
 
     response: DocumentSpecificAnalysis = client.chat.completions.create(
-        model="gemini-2.5-flash",
+        model=DEFAULT_MODEL,
         response_model=DocumentSpecificAnalysis,
         messages=[{"role": "user", "content": content_list}],
     )
@@ -324,7 +327,7 @@ def consolidate_project_context(
     )
 
     response: ConsolidatedProjectEvaluation = client.chat.completions.create(
-        model="gemini-2.5-flash",
+        model=DEFAULT_MODEL,
         response_model=ConsolidatedProjectEvaluation,
         messages=[{"role": "user", "content": prompt}],
     )
