@@ -14,7 +14,7 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 
 # DEFAULT_MODEL = "gemini-2.5-flash"
-0DEFAULT_MODEL = "gemini-3.1-flash-lite"
+DEFAULT_MODEL = "gemini-3.1-flash-lite"
 
 try:
     genai_client = genai.Client(api_key=api_key) if api_key else genai.Client()
