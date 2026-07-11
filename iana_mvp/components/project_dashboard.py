@@ -393,8 +393,7 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                             existing_context=p.get("consolidated_context", "Proyecto inicializado."),
                             existing_infractions=p.get("consolidated_infractions") or [],
                             new_doc_analysis=doc_analysis,
-                            oguc_text=oguc_content,
-                            observations=p_obs.strip()
+                            oguc_text=oguc_content
                         )
                         
                     with st.spinner("Guardando documento en el almacenamiento..."):
