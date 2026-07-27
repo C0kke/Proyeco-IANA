@@ -20,6 +20,7 @@ from app.ai_verifier import (
 )
 from app.report import render_html_report, render_pdf_report
 from components.dialogs import render_edit_project_modal, confirm_delete_document, render_delete_project_modal
+from app.assets import get_asset_base64
 
 def is_duplicate_or_copy_name(name1: str, name2: str) -> bool:
     """
@@ -182,24 +183,26 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
         "other": "Otro"
     }
     
-    col_p1, col_p2 = st.columns([4, 1])
+    col_p1, col_p2 = st.columns([3.5, 1.2], vertical_alignment="center")
     with col_p1:
         st.markdown(
             f"""
             <div class="project-card">
-                <div class="project-header">Proyecto: {p['name']}</div>
-                <div class="project-meta">
-                    Ubicación: <b>{p['commune']}, {p['region']}</b> (Lat: {p['latitude'] or 'N/A'}, Lng: {p['longitude'] or 'N/A'}) <br>
-                    Tipo de Proyecto: <b>{type_mapping.get(p['project_type'], p['project_type'])}</b> | 
-                    ROL Terreno: <b>{p['terrain_rol'] or 'N/A'}</b> | Manzana: <b>{p['block'] or 'N/A'}</b> | Lote: <b>{p['lot'] or 'N/A'}</b>
+                <div class="project-card-header-wrapper">
+                    <div>
+                        <div class="project-header" style="margin-bottom: 2px;">Proyecto: {p['name']}</div>
+                        <div class="project-meta">
+                            Ubicación: <b>{p['commune']}, {p['region']}</b> (Lat: {p['latitude'] or 'N/A'}, Lng: {p['longitude'] or 'N/A'}) <br>
+                            Tipo de Proyecto: <b>{type_mapping.get(p['project_type'], p['project_type'])}</b> | 
+                            ROL Terreno: <b>{p['terrain_rol'] or 'N/A'}</b> | Manzana: <b>{p['block'] or 'N/A'}</b> | Lote: <b>{p['lot'] or 'N/A'}</b>
+                        </div>
+                    </div>
                 </div>
             </div>
             """,
             unsafe_allow_html=True
         )
     with col_p2:
-        st.write("")
-        st.write("")
         if st.button("Editar Proyecto", use_container_width=True):
             render_edit_project_modal()
         if st.button("Eliminar Proyecto", use_container_width=True, key="delete_project_dashboard_btn"):
@@ -319,11 +322,12 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
             if not docs_list:
                 st.warning("No has seleccionado ningún archivo para validar. Sube al menos un plano o especificación técnica en el selector de arriba.")
                 confirm_empty = st.checkbox("Confirmar validación vacía sin archivos", value=False)
-                if st.button("Iniciar Validación Normativa con IA", type="primary", use_container_width=True, disabled=not confirm_empty):
+                if st.button("Iniciar Validación Normativa", type="primary", use_container_width=True, disabled=not confirm_empty):
                     st.info("No hay documentos en el proyecto para validar. Por favor, sube un documento primero para iniciar el análisis.")
+                st.divider()
             else:
                 st.info("No has seleccionado un archivo nuevo. Al iniciar la validación, se re-evaluará el proyecto completo usando los documentos cargados actualmente en el contexto.")
-                if st.button("Iniciar Validación Normativa con IA (Re-evaluar Contexto)", type="primary", use_container_width=True):
+                if st.button("Iniciar Validación Normativa", type="primary", use_container_width=True):
                     with st.spinner("Re-evaluando y reconstruyendo contexto histórico del proyecto..."):
                         from app.ai_verifier import rebuild_project_context
                         rebuild_res = rebuild_project_context(p["id"], st.session_state["jwt_token"], oguc_content)
@@ -339,6 +343,7 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                             st.rerun()
                         else:
                             st.error(f"Error al reconstruir el contexto: {rebuild_res['error']}")
+                st.divider()
         else:
             st.info(f"Archivo listo: **{uploaded_file.name}** ({uploaded_file.size / 1024:.2f} KB)")
             
@@ -360,7 +365,7 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                 confirm_upload = st.checkbox("Entiendo que es una copia y deseo subirlo de todas formas", value=False)
                 
             button_disabled = not confirm_upload
-            if st.button("Iniciar Validación Normativa con IA", type="primary", use_container_width=True, disabled=button_disabled):
+            if st.button("Iniciar Validación Normativa", type="primary", use_container_width=True, disabled=button_disabled):
                 job_id = str(uuid.uuid4())
                 ext = os.path.splitext(uploaded_file.name)[1].lower()
                 pdf_path = os.path.join(uploads_dir, f"{job_id}{ext}")
@@ -679,7 +684,6 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
         else:
             st.info("Aún no se han registrado evaluaciones normativas para este proyecto. Sube un documento en la pestaña 'Validar Nuevo Documento' para comenzar.")
 
-    st.divider()
     col_g1, col_g2 = st.columns([1, 3])
     with col_g1:
         st.metric(

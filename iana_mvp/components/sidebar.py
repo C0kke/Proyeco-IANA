@@ -1,15 +1,25 @@
 import streamlit as st
 from app.version import __version__
 from components.dialogs import render_create_project_modal
+from app.assets import get_asset_base64
 
 def render_sidebar():
+    logo_sidebar_b64 = get_asset_base64("logo_iana.png")
     user_name = st.session_state["user"].user_metadata.get("name", st.session_state["user"].email)
-    st.sidebar.markdown(f'<div class="sidebar-user-name">{user_name}</div>', unsafe_allow_html=True)
-    
     user_role = st.session_state["user"].user_metadata.get("role", "Usuario")
-    st.sidebar.markdown(f'<div class="user-badge">{user_role}</div>', unsafe_allow_html=True)
+    
+    logo_html = f'<img src="{logo_sidebar_b64}" alt="IANA Logo" class="sidebar-logo-img" /><br>' if logo_sidebar_b64 else ""
 
-    st.sidebar.divider()
+    st.sidebar.markdown(
+        f"""
+        <div class="sidebar-user-profile-card">
+            {logo_html}
+            <div class="sidebar-user-name">{user_name}</div>
+            <div class="user-badge">{user_role}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     
     st.sidebar.markdown('<div class="sidebar-title">Proyectos</div>', unsafe_allow_html=True)
     
@@ -23,7 +33,7 @@ def render_sidebar():
         label_visibility="collapsed"
     )
     
-    with st.sidebar.container(key="sidebar_projects_container", height=460, border=False):
+    with st.sidebar.container(key="sidebar_projects_container", height=270, border=False):
         projects_list = st.session_state["projects"]
         if projects_list:
             filtered_projects = projects_list

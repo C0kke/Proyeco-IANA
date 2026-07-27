@@ -1,11 +1,16 @@
 import streamlit as st
 from app.version import __version__
 from components.dialogs import render_create_project_modal
+from app.assets import get_asset_base64
 
 def render_welcome_page(oguc_content: str):
+    welcome_logo_b64 = get_asset_base64("logo_IANA_con_nombre.png")
+    logo_html = f'<img src="{welcome_logo_b64}" alt="IANA Logo" class="welcome-logo-img" /><br>' if welcome_logo_b64 else ""
+
     st.markdown(
         f"""
         <div class="welcome-container">
+            {logo_html}
             <div class="welcome-title">Bienvenido a IANA v{__version__}</div>
             <div class="welcome-subtitle">
                 La plataforma inteligente para validar el cumplimiento de la Ordenanza General de Urbanismo y Construcción (OGUC) de Chile de manera incremental y automatizada.

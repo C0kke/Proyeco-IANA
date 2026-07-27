@@ -1,21 +1,53 @@
 import streamlit as st
 from app.db import sign_in_user, sign_up_user, list_user_projects
 from app.version import __version__
+from app.assets import get_asset_base64
 
 def render_auth_page():
-    st.title(f"IANA v{__version__} — Validador Normativo de Proyectos")
-    st.markdown("Verifica planos y especificaciones técnicas contra la **Ordenanza General de Urbanismo y Construcción (OGUC) de Chile** utilizando Inteligencia Artificial.")
+    logo_name_b64 = get_asset_base64("logo_IANA_con_nombre.png")
+    logo_icon_b64 = get_asset_base64("logo_iana.png")
+
+    if logo_name_b64:
+        st.markdown(
+            f"""
+            <div class="auth-header-container">
+                <img src="{logo_name_b64}" alt="IANA Logo" class="auth-logo-img" />
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.markdown(
+        f"""
+        <div style="text-align: center; max-width: 750px; margin: 0 auto 30px auto;">
+            <h2 class="auth-page-title">Validador Normativo de Proyectos</h2>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     
     col1, col2 = st.columns([1, 1])
     
     with col1:
+        if logo_icon_b64:
+            st.markdown(
+                f"""
+                <div class="auth-info-card">
+                    <div>
+                        <h3 class="auth-info-title">Inteligencia Artificial para normativa arquitectónica</h3>
+                        <p class="auth-info-sub">Revisión automatizada e incremental de proyectos</p>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown("### ¿Qué es IANA?")
+            
         st.markdown(
             """
-            ### ¿Qué es IANA?
-            IANA permite automatizar la revisión de planos de arquitectura, especificaciones técnicas y CIPs (Certificados de Informaciones Previas).
-            
             *   **Contexto Acumulativo de IA:** IANA analiza cada documento y actualiza de manera incremental el contexto del proyecto, permitiendo que un plano resuelva las alertas de una especificación técnica previa.
-            *   **Seguridad RLS:** Acceso exclusivo a tus proyectos personales.
+            *   **Seguridad RLS:** Acceso exclusivo a tus proyectos personales respaldados en la nube.
             *   **Resguardo de Experiencia:** En caso de fallas de conexión, tus archivos se respaldan localmente de inmediato para que sigas trabajando.
             """
         )

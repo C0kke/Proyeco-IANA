@@ -27,7 +27,12 @@ HTML_TMPL = Template(
   </style>
 </head>
 <body>
-  <h1>Informe preliminar — IANA v0.1</h1>
+  {% if logo_b64 %}
+  <div style="margin-bottom: 20px;">
+    <img src="{{ logo_b64 }}" style="max-height: 55px; width: auto;" alt="IANA Logo" />
+  </div>
+  {% endif %}
+  <h1 style="margin-top: 0;">Informe preliminar — IANA</h1>
   <div class="meta">
     Archivo: <b>{{ result.filename }}</b> &middot; 
     Proyecto: <strong>{{ result.project_name }}</strong> &middot; 
@@ -294,6 +299,11 @@ PDF_TMPL = Template(
 </head>
 <body>
   <div class="cover-page">
+    {% if logo_b64 %}
+    <div style="text-align: center; margin-bottom: 30px;">
+      <img src="{{ logo_b64 }}" style="max-width: 280px; height: auto;" alt="IANA Logo" />
+    </div>
+    {% endif %}
     <div class="cover-title">Informe Preliminar</div>
     <div class="cover-subtitle">IANA V0.1.1</div>
     
@@ -405,13 +415,16 @@ def get_status_label(result: Dict[str, Any]) -> str:
         return "Aprobado"
 
 
+from app.assets import get_asset_base64
+
 def render_html_report(filename: str, result: Dict[str, Any]) -> str:
     """
     Renderiza el reporte HTML utilizando la plantilla original (llamativa) del validador.
     Soporta la estructura de infractions (IA).
     """
     status_label = get_status_label(result)
-    return HTML_TMPL.render(filename=filename, result=result, status_label=status_label)
+    logo_b64 = get_asset_base64("logo_IANA_con_nombre.png") or ""
+    return HTML_TMPL.render(filename=filename, result=result, status_label=status_label, logo_b64=logo_b64)
 
 
 def render_pdf_report(filename: str, result: Dict[str, Any]) -> bytes:
@@ -422,11 +435,13 @@ def render_pdf_report(filename: str, result: Dict[str, Any]) -> bytes:
 
     now_str = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     status_label = get_status_label(result)
+    logo_b64 = get_asset_base64("logo_IANA_con_nombre.png") or ""
     html_content = PDF_TMPL.render(
         filename=filename, 
         result=result, 
         created_at=now_str, 
-        status_label=status_label
+        status_label=status_label,
+        logo_b64=logo_b64
     )
     
     doc = fitz.open("html", html_content.encode("utf-8"))

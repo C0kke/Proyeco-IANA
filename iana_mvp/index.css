@@ -1,38 +1,61 @@
-@import url('https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Outfit:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800;900&family=Raleway:wght@400;500;600;700&display=swap');
 
-:root {
-    /* Paleta Cromática ARQCR+3D */
+:root,
+[data-theme="light"],
+[data-theme="dark"],
+[data-testid="stAppViewContainer"],
+.stApp,
+body {
+    --brand-negro-profundo: #0A0A0A;
+    --brand-carbon: #1A1A1A;
     --brand-grafito: #333333;
-    --brand-carbon: #4A4A4A;
-    --brand-acero: #7A7A7A;
-    --brand-plata: #BDBDBD;
-    --brand-oro: #B89B2C;
-    --brand-negro: #000000;
+    --brand-acero: #666666;
+    --brand-plata: #B0B0BD;
     --brand-blanco: #FFFFFF;
+    --brand-dorado: #D4AF37;
+    --brand-dorado-hover: #E5C158;
 
-    /* Tipografías */
-    --font-text: 'Exo 2', sans-serif;
-    --font-logo: 'Outfit', sans-serif;
+    --font-text: 'Raleway', sans-serif;
+    --font-logo: 'Orbitron', sans-serif;
+
+    --bg-main: var(--brand-negro-profundo);
+    --bg-card: var(--brand-carbon);
+    --bg-card-hover: var(--brand-carbon);
+    --bg-sidebar: var(--brand-negro-profundo);
+    --border-color: var(--brand-grafito);
+    --text-title: var(--brand-blanco);
+    --text-body: var(--brand-blanco);
+    --text-muted: var(--brand-blanco);
+    --text-sub: var(--brand-plata);
+    --input-bg: var(--brand-carbon);
+    --input-text: var(--brand-blanco);
+    --tab-active: var(--brand-dorado);
+    --tab-inactive: var(--brand-blanco);
 }
 
-/* Tipografía y Cuerpo General */
+.stApp,
+[data-testid="stAppViewContainer"] {
+    background-color: var(--bg-main) !important;
+    color: var(--text-body) !important;
+}
+
 html,
 body,
-.stMarkdown,
 p,
 label,
 input,
+textarea,
 select,
-textarea {
+li,
+ul {
     font-family: var(--font-text);
+    color: var(--text-body);
 }
 
-.stButton button,
-.stSelectbox div,
-.stTextInput input,
-.stTextArea textarea,
-.stNumberInput input {
-    font-family: var(--font-text) !important;
+.stMarkdown,
+.stMarkdown p {
+    font-family: var(--font-text);
+    color: var(--text-body);
 }
 
 h1,
@@ -42,29 +65,228 @@ h4,
 h5,
 h6 {
     font-family: var(--font-logo) !important;
-    color: var(--brand-grafito) !important;
+    color: var(--text-title) !important;
     font-weight: 700 !important;
     letter-spacing: -0.5px;
 }
 
+[class*="Material"],
+[class*="material"],
+[data-testid="stIcon"],
+[data-baseweb="icon"],
+i {
+    font-family: 'Material Symbols Outlined', 'Material Icons', sans-serif !important;
+}
+
+div[data-testid="stAlert"],
+div.stAlert,
+div[data-baseweb="notification"],
+.stAlert {
+    background-color: var(--brand-carbon) !important;
+    color: var(--brand-blanco) !important;
+    border: 1px solid var(--brand-dorado) !important;
+    border-radius: 8px !important;
+}
+
+div[data-testid="stAlert"] p,
+div[data-testid="stAlert"] span,
+div[data-testid="stAlert"] div,
+div[data-baseweb="notification"] div {
+    color: var(--brand-blanco) !important;
+}
+
+div[data-testid="stAlert"] b,
+div[data-testid="stAlert"] strong {
+    color: var(--brand-dorado) !important;
+}
+
+div[data-testid="stAlert"] svg,
+div[data-baseweb="notification"] svg {
+    fill: var(--brand-dorado) !important;
+    color: var(--brand-dorado) !important;
+}
+
+code {
+    font-family: Consolas, Monaco, monospace !important;
+    color: var(--brand-dorado) !important;
+    background-color: var(--brand-carbon) !important;
+    border: 1px solid var(--brand-grafito) !important;
+    border-radius: 4px !important;
+    padding: 2px 6px !important;
+    font-size: 0.88em !important;
+}
+
+[data-testid="stMetricDelta"],
+div[data-testid="stMetricDelta"] {
+    background-color: var(--brand-carbon) !important;
+    background: var(--brand-carbon) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 6px !important;
+    padding: 3px 8px !important;
+    width: fit-content !important;
+}
+
+[data-testid="stMetricDelta"] svg,
+[data-testid="stMetricDelta"] div,
+[data-testid="stMetricDelta"] span,
+[data-testid="stMetricDelta"] p {
+    color: var(--brand-dorado) !important;
+    fill: var(--brand-dorado) !important;
+}
+
+button[data-baseweb="tab"] {
+    color: var(--tab-inactive) !important;
+    font-family: var(--font-text) !important;
+    font-weight: 600 !important;
+    background: transparent !important;
+    border-bottom: 2px solid transparent !important;
+}
+
+button[data-baseweb="tab"]:hover {
+    color: var(--brand-dorado) !important;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: var(--tab-active) !important;
+    border-bottom-color: var(--brand-dorado) !important;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] p {
+    color: var(--tab-active) !important;
+}
+
+div[data-baseweb="tab-highlight"] {
+    background-color: var(--brand-dorado) !important;
+}
+
+div[data-baseweb="tab-border"] {
+    background-color: var(--border-color) !important;
+}
+
+div[data-baseweb="input"],
+div[data-baseweb="select"],
+div[data-baseweb="textarea"] {
+    background-color: var(--input-bg) !important;
+    border-color: var(--border-color) !important;
+    border-radius: 8px !important;
+}
+
+div[data-baseweb="input"] input,
+div[data-baseweb="textarea"] textarea {
+    color: var(--input-text) !important;
+    font-family: var(--font-text) !important;
+}
+
+div[data-baseweb="input"]:focus-within,
+div[data-baseweb="select"]:focus-within,
+div[data-baseweb="textarea"]:focus-within {
+    border-color: var(--brand-dorado) !important;
+}
+
+div[data-baseweb="popover"],
+div[data-baseweb="menu"],
+ul[role="listbox"] {
+    background-color: var(--bg-card) !important;
+    color: var(--text-body) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.stButton>button {
+    background-color: var(--brand-carbon) !important;
+    color: var(--brand-blanco) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    font-family: var(--font-text) !important;
+    font-weight: 600 !important;
+    padding: 8px 20px !important;
+    transition: all 0.3s ease !important;
+}
+
+.stButton>button:hover {
+    background-color: var(--brand-dorado) !important;
+    color: var(--brand-negro-profundo) !important;
+    border-color: var(--brand-dorado) !important;
+}
+
+.stButton>button[kind="primary"] {
+    background-color: var(--brand-dorado) !important;
+    color: var(--brand-negro-profundo) !important;
+    border: 1px solid var(--brand-dorado) !important;
+    font-family: var(--font-logo) !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.5px;
+}
+
+.stButton>button[kind="primary"]:hover {
+    background-color: var(--brand-dorado-hover) !important;
+    color: var(--brand-negro-profundo) !important;
+}
+
+/* TARJETAS Y VISTAS */
+
+.auth-page-title {
+    font-family: var(--font-logo) !important;
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--text-title);
+    text-align: center !important;
+    margin-bottom: 8px;
+}
+
+.auth-page-subtitle {
+    font-family: var(--font-text) !important;
+    font-size: 15px;
+    color: var(--text-sub);
+    text-align: center !important;
+    max-width: 700px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
+.auth-info-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    background: var(--bg-card);
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.auth-info-title {
+    margin: 0 !important;
+    font-size: 17px !important;
+    color: var(--text-title) !important;
+}
+
+.auth-info-sub {
+    margin: 4px 0 0 0 !important;
+    color: var(--text-sub) !important;
+    font-size: 13px !important;
+}
+
 .welcome-container {
     text-align: center;
-    padding: 50px 30px;
+    padding: 25px;
     max-width: 850px;
-    margin: 0 auto 64px auto;
-    background: radial-gradient(circle at 10% 20%, rgba(241, 245, 249, 0.5) 0%, rgba(255, 255, 255, 0.9) 90%);
+    margin: -40px auto 40px auto;
+    background: var(--bg-card);
     border-radius: 20px;
-    border: 1px solid var(--brand-plata);
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border-color);
+}
+
+.welcome-container img {
+    max-width: 400px;
 }
 
 .welcome-title {
-    font-size: 38px;
+    font-family: var(--font-logo) !important;
+    font-size: 32px;
     font-weight: 800;
-    color: var(--brand-grafito);
+    color: var(--text-title);
     margin-bottom: 15px;
-    letter-spacing: -1px;
-    text-transform: uppercase;
+    letter-spacing: -0.5px;
 }
 
 .welcome-title::after {
@@ -72,154 +294,108 @@ h6 {
     display: block;
     width: 60px;
     height: 4px;
-    background-color: var(--brand-oro);
+    background-color: var(--brand-dorado);
     margin: 15px auto 0 auto;
     border-radius: 2px;
 }
 
 .welcome-subtitle {
-    font-size: 16px;
-    color: var(--brand-carbon);
-    margin-bottom: 40px;
+    font-size: 15px;
+    color: var(--text-sub);
     line-height: 1.7;
 }
 
-.sidebar-title {
-    font-family: var(--font-logo) !important;
-    font-size: 14px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--brand-oro) !important;
-}
-
-.user-badge {
-    background-color: transparent !important;
-    color: var(--brand-oro) !important;
-    padding: 0px !important;
-    font-size: 11px;
-    font-weight: 700;
-    display: inline-block;
-    border: none !important;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.stButton>button {
-    background-color: var(--brand-grafito) !important;
-    color: var(--brand-blanco) !important;
-    border: 1px solid var(--brand-acero) !important;
-    border-radius: 8px !important;
-    font-family: var(--font-text) !important;
-    font-weight: 500 !important;
-    padding: 8px 20px !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
-}
-
-.stButton>button:hover {
-    background-color: var(--brand-oro) !important;
-    color: var(--brand-negro) !important;
-    border-color: var(--brand-oro) !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 20px rgba(184, 155, 44, 0.3) !important;
-}
-
-.stButton>button[kind="primary"] {
-    background-color: var(--brand-oro) !important;
-    color: var(--brand-negro) !important;
-    border: 1px solid var(--brand-oro) !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.5px;
-}
-
-.stButton>button[kind="primary"]:hover {
-    background-color: var(--brand-grafito) !important;
-    color: var(--brand-oro) !important;
-    border-color: var(--brand-oro) !important;
-    box-shadow: 0 8px 20px rgba(51, 51, 51, 0.25) !important;
-}
-
 .option-card {
-    background: var(--brand-blanco);
-    border: 1px solid var(--brand-plata);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: 16px;
-    padding: 30px 24px;
+    padding: 24px;
     text-align: center;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s ease;
     height: 100%;
-    margin-bottom: 20px;
 }
 
 .option-card:hover {
-    transform: translateY(-5px);
-    border-color: var(--brand-oro);
-    box-shadow: 0 15px 30px -10px rgba(184, 155, 44, 0.2);
+    border-color: var(--brand-dorado);
 }
 
 .option-title {
-    font-size: 20px;
+    font-family: var(--font-logo) !important;
+    font-size: 18px;
     font-weight: 700;
-    color: var(--brand-grafito);
+    color: var(--text-title);
     margin-bottom: 10px;
 }
 
 .option-desc {
     font-size: 14px;
-    color: var(--brand-carbon);
-    margin-bottom: 20px;
+    color: var(--text-sub);
     line-height: 1.5;
-    min-height: 60px;
 }
 
 .project-card {
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--brand-plata);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     padding: 24px;
     border-radius: 16px;
     margin-bottom: 25px;
-    box-shadow: 0 10px 25px -10px rgba(0, 0, 0, 0.05);
 }
 
 .project-header {
-    font-size: 24px;
+    font-family: var(--font-logo) !important;
+    font-size: 22px;
     font-weight: 800;
-    color: var(--brand-grafito);
-    margin-bottom: 8px;
+    color: var(--text-title);
 }
 
 .project-meta {
     font-size: 13px;
-    color: var(--brand-acero);
-    margin-bottom: 12px;
+    color: var(--text-sub);
 }
 
 .metric-value {
     font-size: 32px;
     font-weight: 800;
-    color: var(--brand-oro);
+    color: var(--brand-dorado);
     font-family: var(--font-logo) !important;
 }
 
-div[data-baseweb="input"],
-div[data-baseweb="select"],
-div[data-baseweb="textarea"] {
-    border-radius: 8px !important;
-}
+/* BARRA LATERAL */
 
-div[data-baseweb="input"]:focus-within,
-div[data-baseweb="select"]:focus-within,
-div[data-baseweb="textarea"]:focus-within {
-    border-color: var(--brand-oro) !important;
+.sidebar-user-profile-card {
+    text-align: center;
+    padding: 8px 5px 12px 5px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .sidebar-user-name {
-    font-size: 16px;
+    font-family: var(--font-logo) !important;
+    font-size: 14px;
     font-weight: 700;
-    color: var(--brand-negro) !important;
+    color: var(--text-title) !important;
+    margin-top: 6px;
+    margin-bottom: 2px;
+    word-break: break-word;
+}
+
+.user-badge {
+    color: var(--brand-dorado) !important;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sidebar-title {
+    font-family: var(--font-logo) !important;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--brand-dorado) !important;
+    margin: 10px 0 6px 0 !important;
+    padding-top: 2px;
 }
 
 section[data-testid="stSidebar"]>div {
@@ -228,13 +404,41 @@ section[data-testid="stSidebar"]>div {
 
 [data-testid="stSidebar"] {
     overflow: hidden !important;
+    background-color: var(--bg-sidebar) !important;
 }
 
 [data-testid="stSidebarUserContent"] {
     display: flex !important;
     flex-direction: column !important;
-    height: calc(100vh - 20px) !important;
-    overflow: hidden !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    box-sizing: border-box !important;
+    padding: 0.8rem !important;
+}
+
+[data-testid="stSidebarUserContent"]>div[data-testid="stVerticalBlock"] {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    height: 100% !important;
+    gap: 0.75rem !important;
+}
+
+div[key="sidebar_projects_container"] [data-testid="stVerticalBlock"],
+div[data-testid="stVerticalBlockBorderWrapper"]:has(button[key*="sidebar_proj_"]) [data-testid="stVerticalBlock"] {
+    gap: 0.6rem !important;
+    padding-right: 2px !important;
+}
+
+[data-testid="stSidebar"] .stButton>button {
+    margin-top: 2px !important;
+    margin-bottom: 2px !important;
+    padding: 9px 16px !important;
+}
+
+[data-testid="stSidebarUserContent"]>div[data-testid="stVerticalBlock"]>div:has(.sidebar-bottom-spacer) {
+    margin-top: auto !important;
+    padding-top: 10px !important;
 }
 
 .sidebar-bottom-spacer {
@@ -243,9 +447,10 @@ section[data-testid="stSidebar"]>div {
 
 .sidebar-version {
     font-size: 11px;
-    color: #94a3b8;
+    color: var(--text-sub);
     text-align: center;
-    margin-bottom: 10px;
+    margin-top: 6px;
+    margin-bottom: 4px;
 }
 
 .stSidebar button p {
@@ -253,4 +458,46 @@ section[data-testid="stSidebar"]>div {
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     display: block !important;
+}
+
+.auth-header-container {
+    text-align: center;
+    max-width: 450px;
+    max-height: fit-content;
+    padding: 20px 10px 10px 10px;
+    margin: 0 auto;
+}
+
+.auth-logo-img {
+    width: 250px;
+    height: auto;
+    object-fit: contain;
+    transition: transform 0.3s ease;
+}
+
+.sidebar-logo-img {
+    max-width: 140px;
+    max-height: 42px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+.welcome-logo-img {
+    max-width: 280px;
+    height: auto;
+    margin-bottom: 20px;
+}
+
+.project-card-header-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.project-brand-icon {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+    border-radius: 8px;
 }
