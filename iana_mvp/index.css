@@ -501,3 +501,24 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(button[key*="sidebar_proj_"]
     object-fit: contain;
     border-radius: 8px;
 }
+
+header[data-testid="stHeader"] {
+    background: transparent !important;
+}
+
+[data-testid="stToolbar"],
+#MainMenu,
+footer,
+.stAppDeployButton,
+[data-testid="stAppDeployButton"],
+div[data-testid="stStatusWidget"],
+[data-testid="manage-app-button"],
+.viewerBadge_container__16Deep,
+.viewerBadge_link__1S12K,
+div[class*="viewerBadge"],
+div[class*="stAppDeployButton"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}

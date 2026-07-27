@@ -10,16 +10,14 @@ def render_sidebar():
     
     logo_html = f'<img src="{logo_sidebar_b64}" alt="IANA Logo" class="sidebar-logo-img" /><br>' if logo_sidebar_b64 else ""
 
-    st.sidebar.markdown(
-        f"""
-        <div class="sidebar-user-profile-card">
-            {logo_html}
-            <div class="sidebar-user-name">{user_name}</div>
-            <div class="user-badge">{user_role}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
+    profile_card_html = (
+        f'<div class="sidebar-user-profile-card">'
+        f'{logo_html}'
+        f'<div class="sidebar-user-name">{user_name}</div>'
+        f'<div class="user-badge">{user_role}</div>'
+        f'</div>'
     )
+    st.sidebar.markdown(profile_card_html, unsafe_allow_html=True)
     
     st.sidebar.markdown('<div class="sidebar-title">Proyectos</div>', unsafe_allow_html=True)
     
