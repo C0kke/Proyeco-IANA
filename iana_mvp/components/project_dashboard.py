@@ -5,6 +5,7 @@ import json
 import base64
 import re
 from datetime import datetime
+from contextlib import suppress
 
 from app.db import (
     list_project_documents,
@@ -502,10 +503,8 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                     
                 except Exception as e:
                     if os.path.exists(pdf_path):
-                        try:
+                        with suppress(OSError):
                             os.remove(pdf_path)
-                        except Exception:
-                            pass
                     st.error(f"Ocurrió un error durante la validación: {e}")
                 
         if active_job_id:
