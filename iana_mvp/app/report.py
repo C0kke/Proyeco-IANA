@@ -350,10 +350,10 @@ PDF_TMPL = Template(
   {% endif %}
 
   {% if result.dom_form %}
-  <div class="summary-box" style="margin-top: 10px; background-color: #f0fdf4; padding: 10px; border-radius: 4px; border-left: 3px solid #16a34a;">
-    <h3 style="margin-top: 0; margin-bottom: 4px; color: #15803d; font-weight: bold; text-transform: uppercase;">Formulario de Ingreso DOM Recomendado</h3>
-    <p class="summary-text" style="color: #166534; font-weight: bold; margin-bottom: 4px;">{{ result.dom_form.title }} ({{ result.dom_form.category }})</p>
-    <p class="summary-text" style="color: #166534; font-size: 8px;"><b>Fundamento:</b> {{ result.dom_form.reason }}</p>
+  <div class="summary-box" style="margin-top: 10px; background-color: #1a1a1a; padding: 12px; border-radius: 6px; border: 1px solid #333333; border-left: 4px solid #d4af37;">
+    <h3 style="margin-top: 0; margin-bottom: 6px; color: #d4af37; font-weight: bold; text-transform: uppercase;">Formulario de Ingreso DOM Recomendado</h3>
+    <p class="summary-text" style="color: #ffffff; font-weight: bold; margin-bottom: 4px;">{{ result.dom_form.title }} ({{ result.dom_form.category }})</p>
+    <p class="summary-text" style="color: #b0b0bd; font-size: 9px;"><b>Fundamento:</b> {{ result.dom_form.reason }}</p>
   </div>
   {% endif %}
 
@@ -361,7 +361,7 @@ PDF_TMPL = Template(
     <h3>Análisis y Observaciones Generales</h3>
     <p class="summary-text">{{ result.summary_notes }}</p>
   </div>
-
+                                                            
   <div class="page-break"></div>
 
   <div class="section-title">2. Detalle de Infracciones Identificadas (OGUC)</div>

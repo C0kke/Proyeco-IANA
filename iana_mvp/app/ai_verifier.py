@@ -243,35 +243,49 @@ def evaluate_document_individually(
     if pdf_path and os.path.exists(pdf_path) and doc_type in ["site_plan", "sections", "elevations", "cuts"]:
         try:
             import fitz
-            from PIL import Image
-            import io
+            import base64
+            from instructor.processing.multimodal import Image as InstructorImage
+
             doc = fitz.open(pdf_path)
             max_pages = min(len(doc), 3)
+            images_added = 0
             for page_num in range(max_pages):
                 page = doc.load_page(page_num)
                 pix = page.get_pixmap(dpi=120)
                 img_data = pix.tobytes("png")
-                img = Image.open(io.BytesIO(img_data))
-                content_list.append(img)
-            
-            # Avisar a la IA que examine las imágenes
-            prompt_text += (
-                "\n--- ENTRADA MULTIMODAL (IMÁGENES DEL PLANO ADJUNTAS) ---\n"
-                "Hemos renderizado y adjuntado las páginas de este plano como imágenes de alta resolución. "
-                "Debes analizarlas visualmente con extremo cuidado. Coteja las elevaciones, dibujos de cortes, "
-                "líneas, alturas de edificación, distanciamientos y rasantes representados gráficamente, "
-                "ya que la extracción de texto plana puede omitir detalles visuales críticos o cotas numéricas del dibujo."
-            )
-            content_list[0] = prompt_text
+                b64_str = base64.b64encode(img_data).decode("utf-8")
+                inst_img = InstructorImage.from_base64(f"data:image/png;base64,{b64_str}")
+                content_list.append(inst_img)
+                images_added += 1
+            doc.close()
+
+            if images_added > 0:
+                prompt_text += (
+                    "\n--- ENTRADA MULTIMODAL (IMÁGENES DEL PLANO ADJUNTAS) ---\n"
+                    "Hemos renderizado y adjuntado las páginas de este plano como imágenes de alta resolución. "
+                    "Debes analizarlas visualmente con extremo cuidado. Coteja las elevaciones, dibujos de cortes, "
+                    "líneas, alturas de edificación, distanciamientos y rasantes representados gráficamente, "
+                    "ya que la extracción de texto plana puede omitir detalles visuales críticos o cotas numéricas del dibujo."
+                )
+                content_list[0] = prompt_text
         except Exception as img_err:
             print(f"Advertencia al renderizar imágenes del PDF para la IA: {img_err}")
 
-    response: DocumentSpecificAnalysis = client.chat.completions.create(
-        model=DEFAULT_MODEL,
-        response_model=DocumentSpecificAnalysis,
-        messages=[{"role": "user", "content": content_list}],
-    )
-    return response
+    try:
+        response: DocumentSpecificAnalysis = client.chat.completions.create(
+            model=DEFAULT_MODEL,
+            response_model=DocumentSpecificAnalysis,
+            messages=[{"role": "user", "content": content_list}],
+        )
+        return response
+    except Exception as api_err:
+        print(f"Advertencia: Falló el análisis multimodal con imágenes ({api_err}). Reintentando solo con texto...")
+        response: DocumentSpecificAnalysis = client.chat.completions.create(
+            model=DEFAULT_MODEL,
+            response_model=DocumentSpecificAnalysis,
+            messages=[{"role": "user", "content": prompt_text}],
+        )
+        return response
 
 
 def consolidate_project_context(

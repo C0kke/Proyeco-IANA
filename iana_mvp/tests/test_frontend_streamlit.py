@@ -1,11 +1,12 @@
 """
-Pruebas de Interfaz de Usuario / Frontend (Streamlit AppTest).
-Utiliza el framework oficial streamlit.testing.v1.AppTest para simular
-el comportamiento de la interfaz de usuario en Streamlit sin necesidad de un navegador web.
+Pruebas de Interfaz de Usuario / Frontend (Streamlit AppTest & Dashboard components).
+Utiliza el framework oficial streamlit.testing.v1.AppTest y unit tests directos
+para verificar la carga correcta del frontend y sus módulos sin NameError.
 """
 
 import pytest
 from streamlit.testing.v1 import AppTest
+from components.project_dashboard import determine_dom_form, DOM_FORMS_CATALOG, get_form_pdf_bytes, display_results
 
 
 # ==============================================================================
@@ -27,3 +28,21 @@ def test_streamlit_app_initialization():
     
     # Al no haber usuario autenticado, debe mostrar el componente de autenticación (Auth)
     assert not at.exception
+
+
+# ==============================================================================
+# 2. PRUEBAS DE IMPORTACIÓN Y DISPONIBILIDAD DE DOM FORMS EN DASHBOARD
+# ==============================================================================
+
+def test_project_dashboard_dom_form_imports():
+    """
+    CASO COMÚN: Verificar que los componentes de DOM Forms estén disponibles a nivel global
+    en el módulo project_dashboard sin lanzar NameError durante la validación de un archivo.
+    """
+    assert callable(determine_dom_form)
+    assert isinstance(DOM_FORMS_CATALOG, dict)
+    assert callable(get_form_pdf_bytes)
+    
+    res = determine_dom_form({"name": "Test Project"}, "Obra nueva de vivienda")
+    assert "form_id" in res
+    assert "pdf_filename" in res

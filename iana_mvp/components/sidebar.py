@@ -49,6 +49,7 @@ def render_sidebar():
                         use_container_width=True
                     ):
                         st.session_state["active_project"] = p_item
+                        st.query_params["project_id"] = p_item["id"]
                         st.session_state["docs_cache"] = None
                         st.session_state["history_cache"] = None
                         st.session_state["viewing_pdf_id"] = None
@@ -69,6 +70,10 @@ def render_sidebar():
         st.session_state["projects_loaded"] = False
         st.session_state["cookie_to_clear"] = True
         st.session_state["logged_out"] = True
+        if "session_token" in st.query_params:
+            del st.query_params["session_token"]
+        if "project_id" in st.query_params:
+            del st.query_params["project_id"]
         st.rerun()
         
     st.sidebar.markdown(f'<div class="sidebar-version">IANA v{__version__}</div>', unsafe_allow_html=True)

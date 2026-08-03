@@ -76,7 +76,7 @@ def set_session_cookie(token: str):
     parent.document.cookie = cookieStr;
     </script>
     """
-    st.components.v1.html(js, height=0, width=0)
+    st.html(js)
 
 def clear_session_cookie():
     js = """
@@ -88,7 +88,7 @@ def clear_session_cookie():
     parent.document.cookie = cookieStr;
     </script>
     """
-    st.components.v1.html(js, height=0, width=0)
+    st.html(js)
 
 if st.session_state["cookie_to_set"]:
     set_session_cookie(st.session_state["cookie_to_set"])
@@ -116,7 +116,7 @@ def is_jwt_expired(jwt_token: str) -> bool:
     except Exception:
         return True
 
-cookie_token = st.context.cookies.get("session_token")
+cookie_token = st.query_params.get("session_token") or st.context.cookies.get("session_token")
 should_verify = False
 if cookie_token and not st.session_state["logged_out"]:
     if st.session_state["user"] is None:
@@ -129,6 +129,7 @@ if should_verify:
     if res["success"]:
         st.session_state["user"] = res["user"]
         st.session_state["jwt_token"] = res["jwt_token"]
+        st.query_params["session_token"] = res["jwt_token"]
         if res.get("refreshed"):
             st.session_state["cookie_to_set"] = res["jwt_token"]
         
@@ -138,10 +139,21 @@ if should_verify:
                 st.session_state["projects_loaded"] = True
             except Exception as e:
                 print(f"Error al restaurar proyectos tras recarga: {e}")
+
+        active_p_id = st.query_params.get("project_id")
+        if active_p_id and st.session_state.get("projects"):
+            for proj in st.session_state["projects"]:
+                if proj["id"] == active_p_id:
+                    st.session_state["active_project"] = proj
+                    break
     else:
         st.session_state["user"] = None
         st.session_state["jwt_token"] = None
         st.session_state["cookie_to_clear"] = True
+        if "session_token" in st.query_params:
+            del st.query_params["session_token"]
+        if "project_id" in st.query_params:
+            del st.query_params["project_id"]
 
 styles_path = os.path.join(os.path.dirname(__file__), "index.css")
 if os.path.exists(styles_path):

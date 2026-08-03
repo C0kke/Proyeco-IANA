@@ -68,21 +68,6 @@ app = FastAPI(title="IANA MVP - OGUC Validador", version=__version__, lifespan=l
 def get_api_version() -> Dict[str, str]:
     return {"version": __version__}
 
-@app.get("/api/forms")
-def list_dom_forms():
-    return [form.model_dump() for form in DOM_FORMS_CATALOG.values()]
-
-@app.get("/api/forms/{filename}")
-def serve_dom_form_pdf(filename: str):
-    form_path = os.path.join(BASE_DIR, "knowledge", filename)
-    if not os.path.exists(form_path):
-        raise HTTPException(status_code=404, detail="Formulario no encontrado.")
-    return FileResponse(
-        form_path,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename={filename}"}
-    )
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

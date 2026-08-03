@@ -69,6 +69,7 @@ def render_auth_page():
                             st.session_state["jwt_token"] = res["jwt_token"]
                             st.session_state["cookie_to_set"] = res["jwt_token"]
                             st.session_state["logged_out"] = False
+                            st.query_params["session_token"] = res["jwt_token"]
                             st.success("¡Sesión iniciada con éxito!")
                             st.session_state["projects"] = list_user_projects(res["jwt_token"])
                             st.session_state["projects_loaded"] = True
