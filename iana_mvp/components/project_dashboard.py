@@ -120,6 +120,89 @@ def display_results(result_data):
     st.subheader("Resumen Ejecutivo (Consolidado por IA)", anchor=False)
     st.info(result_data.get("summary_notes", "Sin notas del análisis."))
 
+    st.subheader("Formulario de Ingreso a la DOM Recomendado", anchor=False)
+    
+    from app.dom_forms import determine_dom_form, DOM_FORMS_CATALOG, get_form_pdf_bytes
+    
+    dom_form = result_data.get("dom_form")
+    if not dom_form:
+        dom_form = determine_dom_form(
+            project_metadata={"name": result_data.get("project_name")},
+            text_content=result_data.get("summary_notes", "")
+        )
+        
+    pdf_filename = dom_form.get("pdf_filename", "MAPA-FORMULARIOS-OBRAS-DE-EDIFICACION.pdf")
+    form_bytes = get_form_pdf_bytes(pdf_filename)
+    permits_html = "".join([f"<li>{p}</li>" for p in dom_form.get("applicable_permits", [])])
+    
+    st.markdown(
+        f"""
+        <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-left: 5px solid #16a34a; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <div style="font-size: 15px; font-weight: 700; color: #15803d; margin-bottom: 6px;">
+                {dom_form.get('title')} ({dom_form.get('category')})
+            </div>
+            <div style="font-size: 13px; color: #166534; margin-bottom: 10px;">
+                <b>Fundamento de Asignación:</b> {dom_form.get('reason')}
+            </div>
+            <div style="font-size: 12px; color: #334155;">
+                <b>Trámites y Permisos contemplados por este formulario:</b>
+                <ul style="margin: 4px 0 0 18px; padding: 0;">
+                    {permits_html}
+                </ul>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        if form_bytes:
+            st.download_button(
+                label=f"Descargar {dom_form.get('title')}",
+                data=form_bytes,
+                file_name=pdf_filename,
+                mime="application/pdf",
+                key=f"dl_dom_form_{result_data.get('job_id')}",
+                use_container_width=True
+            )
+        else:
+            st.button("Formulario PDF no disponible en disco", disabled=True, use_container_width=True)
+            
+    with col_f2:
+        api_form_url = f"http://localhost:8000/api/forms/{pdf_filename}"
+        st.link_button(
+            label="Abrir / Imprimir Formulario en Nueva Pestaña",
+            url=api_form_url,
+            use_container_width=True
+        )
+        
+    with st.expander("Ver o Descargar Formularios DOM de otras Fases (Fases 1 a 5)"):
+        st.caption("Selecciona cualquier formulario oficial de la DOM si tu proyecto requiere un trámite mixto o específico:")
+        for fid, finfo in DOM_FORMS_CATALOG.items():
+            col_cat1, col_cat2, col_cat3 = st.columns([3.2, 1.2, 1.2])
+            with col_cat1:
+                st.markdown(f"**{finfo.title}**  \n<small style='color: #64748b;'>{finfo.description}</small>", unsafe_allow_html=True)
+            with col_cat2:
+                f_bytes = get_form_pdf_bytes(finfo.pdf_filename)
+                if f_bytes:
+                    st.download_button(
+                        label="Descargar PDF",
+                        data=f_bytes,
+                        file_name=finfo.pdf_filename,
+                        mime="application/pdf",
+                        key=f"dl_cat_form_{fid}_{result_data.get('job_id')}",
+                        use_container_width=True
+                    )
+            with col_cat3:
+                st.link_button(
+                    label="Abrir en pestaña",
+                    url=f"http://localhost:8000/api/forms/{finfo.pdf_filename}",
+                    key=f"view_cat_form_{fid}_{result_data.get('job_id')}",
+                    use_container_width=True
+                )
+            st.divider()
+
     st.subheader("Detalle de Infracciones de la OGUC", anchor=False)
     
     if infractions:
@@ -469,6 +552,12 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                     else:
                         raise ValueError(f"Error al actualizar el contexto consolidado en la DB: {update_res['error']}")
 
+                    dom_form = determine_dom_form(
+                        project_metadata=p,
+                        text_content=consolidated.consolidated_context,
+                        ai_recommendation_id=consolidated.recommended_dom_form_id
+                    )
+
                     result_data = {
                         "job_id": job_id,
                         "user_id": st.session_state["user"].id,
@@ -479,7 +568,8 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                         "is_valid": consolidated.is_valid_project_documentation,
                         "infractions": [inf.model_dump() for inf in consolidated.consolidated_infractions],
                         "summary_notes": consolidated.consolidated_context,
-                        "observaciones": p_obs.strip()
+                        "observaciones": p_obs.strip(),
+                        "dom_form": dom_form
                     }
                     
                     out_json = os.path.join(results_dir, f"{job_id}.json")

@@ -349,6 +349,14 @@ PDF_TMPL = Template(
   </div>
   {% endif %}
 
+  {% if result.dom_form %}
+  <div class="summary-box" style="margin-top: 10px; background-color: #f0fdf4; padding: 10px; border-radius: 4px; border-left: 3px solid #16a34a;">
+    <h3 style="margin-top: 0; margin-bottom: 4px; color: #15803d; font-weight: bold; text-transform: uppercase;">Formulario de Ingreso DOM Recomendado</h3>
+    <p class="summary-text" style="color: #166534; font-weight: bold; margin-bottom: 4px;">{{ result.dom_form.title }} ({{ result.dom_form.category }})</p>
+    <p class="summary-text" style="color: #166534; font-size: 8px;"><b>Fundamento:</b> {{ result.dom_form.reason }}</p>
+  </div>
+  {% endif %}
+
   <div class="summary-box">
     <h3>Análisis y Observaciones Generales</h3>
     <p class="summary-text">{{ result.summary_notes }}</p>

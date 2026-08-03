@@ -59,6 +59,10 @@ class ProjectEvaluation(BaseModel):
     summary_notes: str = Field(
         description="Resumen de la evaluación, observaciones generales y recomendaciones clave de viabilidad"
     )
+    recommended_dom_form_id: Optional[str] = Field(
+        default="form_2",
+        description="Identificador del formulario de ingreso a la DOM (Dirección de Obras Municipales) recomendado: 'form_1' (Obras Menores), 'form_2' (Obras de Edificación / Obra Nueva), 'form_3' (Obras de Urbanización / Loteos), 'form_4' (Subdivisiones y Fusión Predial), o 'form_5' (Otras Obras / Demoliciones)."
+    )
 
 
 class DocumentSpecificAnalysis(BaseModel):
@@ -95,6 +99,10 @@ class ConsolidatedProjectEvaluation(BaseModel):
     extracted_metadata: List[MetadataItem] = Field(
         default_factory=list,
         description="Lista consolidada que unifica todos los parámetros catastrales y normativos acumulados del proyecto."
+    )
+    recommended_dom_form_id: Optional[str] = Field(
+        default="form_2",
+        description="Identificador del formulario de ingreso a la DOM (Dirección de Obras Municipales) recomendado: 'form_1' (Obras Menores), 'form_2' (Obras de Edificación / Obra Nueva), 'form_3' (Obras de Urbanización / Loteos), 'form_4' (Subdivisiones y Fusión Predial), o 'form_5' (Otras Obras / Demoliciones)."
     )
 
 def retrieve_relevant_oguc_content(plan_text: str, oguc_text: str, max_tokens_budget: int = 40000) -> str:

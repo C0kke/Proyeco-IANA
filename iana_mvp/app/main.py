@@ -4,15 +4,16 @@ import json
 import os
 import uuid
 from typing import Dict, Optional
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, UploadFile, Response, Depends, Header, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from pydantic import BaseModel
-from typing import Optional
 
 from .pdf_extract import extract_text_blocks
 from .report import render_html_report
+from .dom_forms import determine_dom_form, DOM_FORMS_CATALOG
 from .ai_verifier import (
     evaluate_project_with_ai,
     evaluate_document_individually,
@@ -39,11 +40,48 @@ RESULTS = os.path.join(DATA_DIR, "results")
 os.makedirs(UPLOADS, exist_ok=True)
 os.makedirs(RESULTS, exist_ok=True)
 
-app = FastAPI(title="IANA MVP - OGUC Validador", version=__version__)
+OGUC_CONTENT = ""
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global OGUC_CONTENT
+    oguc_path = os.path.join(BASE_DIR, "knowledge", "OGUC_2026.md")
+    if os.path.exists(oguc_path):
+        print(f"Cargando OGUC en memoria desde: {oguc_path}...")
+        with open(oguc_path, "r", encoding="utf-8") as handle:
+            OGUC_CONTENT = handle.read()
+        print(f"OGUC cargada con éxito. Tamaño: {len(OGUC_CONTENT)} caracteres.")
+    else:
+        alt_path = os.path.join(os.path.dirname(BASE_DIR), "knowledge", "OGUC_2026.md")
+        if os.path.exists(alt_path):
+            print(f"Cargando OGUC en memoria desde ruta alternativa: {alt_path}...")
+            with open(alt_path, "r", encoding="utf-8") as handle:
+                OGUC_CONTENT = handle.read()
+            print(f"OGUC cargada con éxito. Tamaño: {len(OGUC_CONTENT)} caracteres.")
+        else:
+            print("ADVERTENCIA: No se encontró el archivo OGUC_2026.md. Asegúrate de que existe en la carpeta 'knowledge'.")
+    yield
+
+app = FastAPI(title="IANA MVP - OGUC Validador", version=__version__, lifespan=lifespan)
 
 @app.get("/api/version")
 def get_api_version() -> Dict[str, str]:
     return {"version": __version__}
+
+@app.get("/api/forms")
+def list_dom_forms():
+    return [form.model_dump() for form in DOM_FORMS_CATALOG.values()]
+
+@app.get("/api/forms/{filename}")
+def serve_dom_form_pdf(filename: str):
+    form_path = os.path.join(BASE_DIR, "knowledge", filename)
+    if not os.path.exists(form_path):
+        raise HTTPException(status_code=404, detail="Formulario no encontrado.")
+    return FileResponse(
+        form_path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -79,27 +117,6 @@ async def get_current_user(authorization: str = Header(None)):
         "user": res["user"],
         "token": token
     }
-
-OGUC_CONTENT = ""
-
-@app.on_event("startup")
-def load_oguc():
-    global OGUC_CONTENT
-    oguc_path = os.path.join(BASE_DIR, "knowledge", "OGUC_2026.md")
-    if os.path.exists(oguc_path):
-        print(f"Cargando OGUC en memoria desde: {oguc_path}...")
-        with open(oguc_path, "r", encoding="utf-8") as handle:
-            OGUC_CONTENT = handle.read()
-        print(f"OGUC cargada con éxito. Tamaño: {len(OGUC_CONTENT)} caracteres.")
-    else:
-        alt_path = os.path.join(os.path.dirname(BASE_DIR), "knowledge", "OGUC_2026.md")
-        if os.path.exists(alt_path):
-            print(f"Cargando OGUC en memoria desde ruta alternativa: {alt_path}...")
-            with open(alt_path, "r", encoding="utf-8") as handle:
-                OGUC_CONTENT = handle.read()
-            print(f"OGUC cargada con éxito. Tamaño: {len(OGUC_CONTENT)} caracteres.")
-        else:
-            print("ADVERTENCIA: No se encontró el archivo OGUC_2026.md. Asegúrate de que existe en la carpeta 'knowledge'.")
 
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
@@ -185,61 +202,61 @@ async def upload_pdf(
 
     eval_dict = None
     if project_id:
-               client = get_supabase_client(current_user["token"])
-             proj_res = client.table("projects").select("*").eq("id", project_id).execute()
-             if proj_res.data:
-                 project = proj_res.data[0]
-                 
-                 print(f"Iniciando análisis individual de documento '{file.filename}' (Tipo: {document_type})...")
-                 doc_analysis = evaluate_document_individually(
-                     doc_text=plan_text,
-                     doc_type=document_type,
-                     oguc_text=OGUC_CONTENT,
-                     observaciones=observaciones
-                 )
-                 
-                 if upload_res and upload_res.get("success") and "document" in upload_res:
-                     doc_id = upload_res["document"].get("id")
-                     if doc_id:
-                         try:
-                             save_document_analysis({
-                                 "document_id": doc_id,
-                                 "extracted_text_summary": doc_analysis.document_summary,
-                                 "infractions": [inf.model_dump() for inf in doc_analysis.infractions],
-                                 "metadata": {
-                                     **doc_analysis.extracted_metadata,
-                                     "observations": observaciones.strip()
-                                 }
-                             }, current_user["token"])
-                             print(f"Análisis individual de documento guardado en DB.")
-                         except Exception as db_err:
-                             print(f"Error guardando análisis del documento en la DB: {db_err}")
- 
-                 print(f"Consolidando contexto incremental para el proyecto {project_id}...")
-                 existing_context = project.get("consolidated_context", "") or "Proyecto inicializado sin documentos."
-                 existing_infractions = project.get("consolidated_infractions", []) or []
-                 
-                 consolidated = consolidate_project_context(
-                     project_metadata=project,
-                     existing_context=existing_context,
-                     existing_infractions=existing_infractions,
-                     new_doc_analysis=doc_analysis,
-                     oguc_text=OGUC_CONTENT
-                 )
-                 
-                 update_project_context_db(
-                     project_id=project_id,
-                     context_data={
-                         "consolidated_context": consolidated.consolidated_context,
-                         "consolidated_infractions": [inf.model_dump() for inf in consolidated.consolidated_infractions],
-                         "success_probability": consolidated.success_probability,
-                         "extracted_metadata": consolidated.extracted_metadata,
-                         "terrain_rol": consolidated.extracted_metadata.get("rol_terreno", project.get("terrain_rol")),
-                         "block": consolidated.extracted_metadata.get("manzana", project.get("block")),
-                         "lot": consolidated.extracted_metadata.get("lote", project.get("lot"))
-                     },
-                     jwt_token=current_user["token"]
-                 )
+        try:
+            client = get_supabase_client(current_user["token"])
+            proj_res = client.table("projects").select("*").eq("id", project_id).execute()
+            if proj_res.data:
+                project = proj_res.data[0]
+                
+                print(f"Iniciando análisis individual de documento '{file.filename}' (Tipo: {document_type})...")
+                doc_analysis = evaluate_document_individually(
+                    doc_text=plan_text,
+                    doc_type=document_type,
+                    oguc_text=OGUC_CONTENT,
+                    observaciones=observaciones
+                )
+                
+                if upload_res and upload_res.get("success") and "document" in upload_res:
+                    doc_id = upload_res["document"].get("id")
+                    if doc_id:
+                        try:
+                            save_document_analysis({
+                                "document_id": doc_id,
+                                "extracted_text_summary": doc_analysis.document_summary,
+                                "infractions": [inf.model_dump() for inf in doc_analysis.infractions],
+                                "metadata": {
+                                    **doc_analysis.extracted_metadata,
+                                    "observations": observaciones.strip()
+                                }
+                            }, current_user["token"])
+                            print(f"Análisis individual de documento guardado en DB.")
+                        except Exception as db_err:
+                            print(f"Error guardando análisis del documento en la DB: {db_err}")
+                print(f"Consolidando contexto incremental para el proyecto {project_id}...")
+                existing_context = project.get("consolidated_context", "") or "Proyecto inicializado sin documentos."
+                existing_infractions = project.get("consolidated_infractions", []) or []
+                
+                consolidated = consolidate_project_context(
+                    project_metadata=project,
+                    existing_context=existing_context,
+                    existing_infractions=existing_infractions,
+                    new_doc_analysis=doc_analysis,
+                    oguc_text=OGUC_CONTENT
+                )
+                
+                update_project_context_db(
+                    project_id=project_id,
+                    context_data={
+                        "consolidated_context": consolidated.consolidated_context,
+                        "consolidated_infractions": [inf.model_dump() for inf in consolidated.consolidated_infractions],
+                        "success_probability": consolidated.success_probability,
+                        "extracted_metadata": consolidated.extracted_metadata,
+                        "terrain_rol": consolidated.extracted_metadata.get("rol_terreno", project.get("terrain_rol")),
+                        "block": consolidated.extracted_metadata.get("manzana", project.get("block")),
+                        "lot": consolidated.extracted_metadata.get("lote", project.get("lot"))
+                    },
+                    jwt_token=current_user["token"]
+                )
                 
                 eval_dict = {
                     "project_name": project.get("name"),
@@ -273,6 +290,12 @@ async def upload_pdf(
                 "summary_notes": "Error crítico al procesar la verificación por Inteligencia Artificial."
             }
 
+    dom_form = determine_dom_form(
+        project_metadata={"name": eval_dict.get("project_name", file.filename), "project_type": document_type},
+        text_content=plan_text,
+        ai_recommendation_id=eval_dict.get("recommended_dom_form_id")
+    )
+
     result = {
         "job_id": job_id,
         "user_id": current_user["user"].id,
@@ -281,7 +304,8 @@ async def upload_pdf(
         "success_probability": eval_dict.get("success_probability", 0.0),
         "infractions": eval_dict.get("infractions", []),
         "summary_notes": eval_dict.get("summary_notes", ""),
-        "observaciones": observaciones.strip()
+        "observaciones": observaciones.strip(),
+        "dom_form": dom_form
     }
     
     out_json = os.path.join(RESULTS, f"{job_id}.json")
