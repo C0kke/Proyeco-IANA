@@ -235,13 +235,40 @@ def display_results(result_data):
     st.subheader("Resumen Ejecutivo (Consolidado por IA)", anchor=False)
     st.info(result_data.get("summary_notes", "Sin notas del análisis."))
 
-    rec_id = result_data.get("dom_form", {}).get("form_id") if isinstance(result_data.get("dom_form"), dict) else None
-    render_dom_forms_section(
-        project_metadata={"name": result_data.get("project_name")},
-        context_text=result_data.get("summary_notes", ""),
-        ai_recommendation_id=rec_id,
-        job_id_suffix=result_data.get("job_id", "res")
-    )
+    docs = st.session_state.get("docs_cache") or []
+    uploaded_types = {d.get("document_type") for d in docs}
+    has_dom_prereqs = {"cip", "ett", "sections"}.issubset(uploaded_types)
+    if "has_dom_prerequisites" in result_data:
+        has_dom_prereqs = result_data["has_dom_prerequisites"]
+
+    if has_dom_prereqs:
+        rec_id = result_data.get("dom_form", {}).get("form_id") if isinstance(result_data.get("dom_form"), dict) else None
+        render_dom_forms_section(
+            project_metadata={"name": result_data.get("project_name")},
+            context_text=result_data.get("summary_notes", ""),
+            ai_recommendation_id=rec_id,
+            job_id_suffix=result_data.get("job_id", "res")
+        )
+    else:
+        st.markdown(
+            """
+            <div style="background-color: #1A1A1A; border: 1px solid #333333; border-left: 5px solid #D4AF37; border-radius: 8px; padding: 18px; margin-top: 15px; margin-bottom: 20px;">
+                <div style="font-size: 15px; font-weight: 700; color: #D4AF37; margin-bottom: 6px;">
+                    Formulario de Ingreso DOM (Requiere Documentación Mínima)
+                </div>
+                <div style="font-size: 13px; color: #FFFFFF; line-height: 1.5;">
+                    Para determinar el formulario de ingreso a la DOM (Dirección de Obras Municipales) y habilitar su descarga, 
+                    el proyecto debe contar obligatoriamente con los siguientes 3 documentos cargados:
+                    <ul style="margin: 8px 0 0 18px; padding: 0; color: #B0B0BD;">
+                        <li>Certificado de Informaciones Previas (CIP)</li>
+                        <li>Especificaciones Técnicas (ETT)</li>
+                        <li>Plano de Arquitectura</li>
+                    </ul>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     st.subheader("Detalle de Infracciones de la OGUC", anchor=False)
     
@@ -355,13 +382,21 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
         
     st.write("")
     
-    if "active_tab" not in st.session_state:
-        st.session_state["active_tab"] = "Validar Nuevo Documento"
+    has_dom_prerequisites = {"cip", "ett", "sections"}.issubset(uploaded_types)
+    
     if "file_uploader_key" not in st.session_state:
         st.session_state["file_uploader_key"] = "file_uploader_init"
         
-    tab_options = ["Validar Nuevo Documento", "Formularios DOM (MINVU)", "Documentos Asociados", "Historial de Aprobación"]
-    
+    if has_dom_prerequisites:
+        tab_options = ["Validar Nuevo Documento", "Formularios DOM (MINVU)", "Documentos Asociados", "Historial de Aprobación"]
+    else:
+        tab_options = ["Validar Nuevo Documento", "Documentos Asociados", "Historial de Aprobación"]
+        if st.session_state.get("active_tab") == "Formularios DOM (MINVU)":
+            st.session_state["active_tab"] = "Validar Nuevo Documento"
+
+    if "active_tab" not in st.session_state or st.session_state["active_tab"] not in tab_options:
+        st.session_state["active_tab"] = "Validar Nuevo Documento"
+        
     st.radio(
         "Navegación",
         options=tab_options,
@@ -592,11 +627,17 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                     else:
                         raise ValueError(f"Error al actualizar el contexto consolidado en la DB: {update_res['error']}")
 
-                    dom_form = determine_dom_form(
-                        project_metadata=p,
-                        text_content=consolidated.consolidated_context,
-                        ai_recommendation_id=consolidated.recommended_dom_form_id
-                    )
+                    current_doc_types = {d["document_type"] for d in (docs or [])}
+                    current_doc_types.add(db_doc_type)
+                    eval_has_dom_prereqs = {"cip", "ett", "sections"}.issubset(current_doc_types)
+
+                    dom_form = None
+                    if eval_has_dom_prereqs:
+                        dom_form = determine_dom_form(
+                            project_metadata=p,
+                            text_content=consolidated.consolidated_context,
+                            ai_recommendation_id=consolidated.recommended_dom_form_id
+                        )
 
                     result_data = {
                         "job_id": job_id,
@@ -609,6 +650,7 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                         "infractions": [inf.model_dump() for inf in consolidated.consolidated_infractions],
                         "summary_notes": consolidated.consolidated_context,
                         "observaciones": p_obs.strip(),
+                        "has_dom_prerequisites": eval_has_dom_prereqs,
                         "dom_form": dom_form
                     }
                     

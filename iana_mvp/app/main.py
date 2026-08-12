@@ -275,11 +275,23 @@ async def upload_pdf(
                 "summary_notes": "Error crítico al procesar la verificación por Inteligencia Artificial."
             }
 
-    dom_form = determine_dom_form(
-        project_metadata={"name": eval_dict.get("project_name", file.filename), "project_type": document_type},
-        text_content=plan_text,
-        ai_recommendation_id=eval_dict.get("recommended_dom_form_id")
-    )
+    has_dom_prerequisites = False
+    if project_id:
+        try:
+            existing_docs = list_project_documents(project_id, token)
+            uploaded_types = {d.get("document_type") for d in (existing_docs or [])}
+            uploaded_types.add(document_type)
+            has_dom_prerequisites = {"cip", "ett", "sections"}.issubset(uploaded_types)
+        except Exception:
+            has_dom_prerequisites = False
+
+    dom_form = None
+    if has_dom_prerequisites:
+        dom_form = determine_dom_form(
+            project_metadata={"name": eval_dict.get("project_name", file.filename), "project_type": document_type},
+            text_content=plan_text,
+            ai_recommendation_id=eval_dict.get("recommended_dom_form_id")
+        )
 
     result = {
         "job_id": job_id,
@@ -290,6 +302,7 @@ async def upload_pdf(
         "infractions": eval_dict.get("infractions", []),
         "summary_notes": eval_dict.get("summary_notes", ""),
         "observaciones": observaciones.strip(),
+        "has_dom_prerequisites": has_dom_prerequisites,
         "dom_form": dom_form
     }
     

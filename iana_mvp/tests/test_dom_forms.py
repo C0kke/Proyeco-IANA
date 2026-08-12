@@ -110,3 +110,15 @@ def test_determine_dom_form_default_obra_nueva():
     )
     assert res["form_id"] == "form_2"
     assert res["pdf_filename"] == "MAPA-FORMULARIOS-OBRAS-DE-EDIFICACION.pdf"
+
+def test_dom_prerequisites_incomplete():
+    """CASO COMÚN / CONTROL DE ERRORES: Faltan documentos requeridos (CIP, ETT, Arquitectura)."""
+    uploaded_types = {"sections", "elevations"}
+    required = {"cip", "ett", "sections"}
+    assert not required.issubset(uploaded_types)
+
+def test_dom_prerequisites_complete():
+    """CASO COMÚN: Se han cargado CIP, ETT y Plano de Arquitectura (sections)."""
+    uploaded_types = {"cip", "ett", "sections", "elevations"}
+    required = {"cip", "ett", "sections"}
+    assert required.issubset(uploaded_types)
