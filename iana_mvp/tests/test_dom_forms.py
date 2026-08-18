@@ -3,7 +3,6 @@ Pruebas Unitarias para el Módulo de Clasificación de Formularios DOM (dom_form
 Prueba la lógica de catálogo, reglas de negocio deterministas y sugerencia por IA.
 """
 
-import pytest
 from app.dom_forms import (
     determine_dom_form,
     get_form_by_id,

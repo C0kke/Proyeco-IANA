@@ -194,11 +194,15 @@ async def upload_pdf(
                 project = proj_res.data[0]
                 
                 print(f"Iniciando análisis individual de documento '{file.filename}' (Tipo: {document_type})...")
+                meta_dict = project.get("extracted_metadata") if isinstance(project.get("extracted_metadata"), dict) else {}
                 doc_analysis = evaluate_document_individually(
                     doc_text=plan_text,
                     doc_type=document_type,
                     oguc_text=OGUC_CONTENT,
-                    observaciones=observaciones
+                    observaciones=observaciones,
+                    region=project.get("region", ""),
+                    commune=project.get("commune", ""),
+                    zone_code=meta_dict.get("zona_prc") or meta_dict.get("zona")
                 )
                 
                 if upload_res and upload_res.get("success") and "document" in upload_res:
