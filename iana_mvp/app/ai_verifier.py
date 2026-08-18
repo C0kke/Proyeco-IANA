@@ -6,7 +6,7 @@ import json
 from google import genai
 import instructor
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -64,6 +64,19 @@ class ProjectEvaluation(BaseModel):
         description="Identificador del formulario de ingreso a la DOM (Dirección de Obras Municipales) recomendado: 'form_1' (Obras Menores), 'form_2' (Obras de Edificación / Obra Nueva), 'form_3' (Obras de Urbanización / Loteos), 'form_4' (Subdivisiones y Fusión Predial), o 'form_5' (Otras Obras / Demoliciones)."
     )
 
+class RuleCheck(BaseModel):
+    rule_id: str = Field(description="Artículo de la OGUC o PRC evaluado, ej: 'Art. 4.1.7 OGUC' o 'PRC Coquimbo Art. 12'")
+    category: str = Field(description="Categoría técnica: 'Accesibilidad y Puertas', 'Habitabilidad y Ventilación', 'Rasantes y Distanciamientos', 'Zonificación y Alturas', 'Seguridad contra Incendio', 'Estructura y Materiales'")
+    element_inspected: str = Field(description="Elemento físico inspeccionado, ej: 'Puerta principal de acceso', 'Distanciamiento lateral norte', 'Ventana dormitorio principal', 'Altura máxima'")
+    evidence_found: str = Field(description="Cota, medida o texto exacto encontrado en el plano o ETT, ej: 'Cota de 0.90 m en Lámina A-01', '12 metros proyectados'")
+    document_source: str = Field(default="Documento del proyecto", description="Nombre o tipo de documento de origen, ej: 'Plano de arquitectura', 'ETT', 'CIP'")
+    status: Literal["CUMPLE", "NO CUMPLE", "ALERTA", "NO VERIFICABLE", "NO APLICA"] = Field(description="Estado de cumplimiento normativo")
+    detection_method: Literal["Ciencia de Datos (Regex / NLP)", "Modelo de IA (Gemini Multimodal)", "Motor Determinista PRC"] = Field(
+        default="Modelo de IA (Gemini Multimodal)",
+        description="Método por el cual el sistema identificó y auditó la norma"
+    )
+    technical_rationale: str = Field(description="Fundamento técnico detallado de por qué cumple o no cumple")
+
 
 class DocumentSpecificAnalysis(BaseModel):
     """Análisis individual de un documento específico"""
@@ -80,7 +93,10 @@ class DocumentSpecificAnalysis(BaseModel):
         default_factory=list,
         description="Lista de parámetros catastrales y normativos clave extraídos."
     )
-
+    inspected_rules: List[RuleCheck] = Field(
+        default_factory=list,
+        description="Registro detallado de elementos constructivos y normas inspeccionadas en este documento (tanto conformes 'CUMPLE' como infracciones 'NO CUMPLE' o 'ALERTA')."
+    )
 
 class ConsolidatedProjectEvaluation(BaseModel):
     """Evaluación consolidada acumulativa del proyecto"""
@@ -99,6 +115,10 @@ class ConsolidatedProjectEvaluation(BaseModel):
     extracted_metadata: List[MetadataItem] = Field(
         default_factory=list,
         description="Lista consolidada que unifica todos los parámetros catastrales y normativos acumulados del proyecto."
+    )
+    inspected_rules: List[RuleCheck] = Field(
+        default_factory=list,
+        description="Registro maestro y consolidado de trazabilidad de todas las reglas y elementos inspeccionados (CUMPLE, NO CUMPLE, ALERTA) para el proyecto."
     )
     recommended_dom_form_id: Optional[str] = Field(
         default="form_2",
@@ -204,11 +224,15 @@ def evaluate_document_individually(
     doc_type: str, 
     oguc_text: str,
     observaciones: str = "",
-    pdf_path: Optional[str] = None
+    pdf_path: Optional[str] = None,
+    region: str = "",
+    commune: str = "",
+    zone_code: Optional[str] = None
 ) -> DocumentSpecificAnalysis:
     """
     Realiza un análisis individual de un documento específico de acuerdo a su tipo
-    (CIP, ETT, site_plan, etc.). Extrae variables, parámetros y alertas locales de la OGUC.
+    (CIP, ETT, site_plan, etc.). Extrae variables, parámetros y alertas locales de la OGUC
+    y del Plan Regulador Comunal (PRC) si la comuna cuenta con ordenanza local.
     Soporta análisis visual de planos adjuntando imágenes de páginas de PDF al prompt de Gemini.
     """
     if not client:
@@ -218,7 +242,7 @@ def evaluate_document_individually(
 
     prompt_text = (
         "Actúa como un revisor normativo experto en edificación de Chile.\n"
-        f"Analiza este documento de tipo: '{doc_type}' contra los artículos relevantes de la OGUC.\n\n"
+        f"Analiza este documento de tipo: '{doc_type}' contra los artículos relevantes de la OGUC y la Ordenanza Local.\n\n"
     )
     if observaciones:
         prompt_text += (
@@ -228,14 +252,30 @@ def evaluate_document_individually(
     prompt_text += (
         "--- LEY OFICIAL (OGUC CHILE) ---\n"
         f"{relevant_oguc}\n\n"
+    )
+    
+    if commune:
+        try:
+            from knowledge.prc.registry import extract_prc_context_for_prompt
+            prc_context = extract_prc_context_for_prompt(region=region, commune=commune, zone_code=zone_code)
+            if prc_context:
+                prompt_text += (
+                    "--- ORDENANZA LOCAL (PLAN REGULADOR COMUNAL) ---\n"
+                    f"{prc_context}\n\n"
+                )
+        except Exception as prc_err:
+            print(f"Advertencia cargando PRC para {commune}: {prc_err}")
+            
+    prompt_text += (
         "--- CONTENIDO DE TEXTO EXTRAÍDO DEL ARCHIVO ---\n"
         f"{doc_text}\n\n"
         "Tu tarea consiste en:\n"
         "1. Generar un resumen técnico del contenido del archivo.\n"
-        "2. Identificar infracciones a la OGUC presentes únicamente en este archivo.\n"
-        "3. Extraer metadatos claves (ej: 'rol_terreno', 'comuna', 'region', 'superficie_terreno', "
+        "2. Identificar infracciones tanto a la OGUC como al Plan Regulador Comunal (si aplica) presentes en este archivo.\n"
+        "3. Extraer metadatos claves (ej: 'rol_terreno', 'comuna', 'region', 'zona_prc', 'superficie_terreno', "
         "'altura_maxima', 'manzana', 'lote', 'constructibilidad', 'ocupacion_suelo') en formato clave-valor.\n"
         "4. Determinar si el documento tiene relación directa con arquitectura, edificación, construcción, planos, ETT, CIP, etc. Si el documento trata de informática, software, cocina, literatura, u otro tema no constructivo, debes marcar is_valid_architectural_doc = False; de lo contrario, True.\n"
+        "5. Registrar en inspected_rules cada una de las verificaciones técnicas realizadas (puertas, ventanas/iluminación, alturas, rasantes, distanciamientos, etc.), señalando si CUMPLE, NO CUMPLE o es ALERTA, la evidencia/cota exacta encontrada en el plano/texto y detection_method='Modelo de IA (Gemini Multimodal)'.\n"
     )
 
     content_list = [prompt_text]
@@ -327,6 +367,23 @@ def consolidate_project_context(
         )
         
     new_doc_meta_dict = {item.key: item.value for item in new_doc_analysis.extracted_metadata}
+    
+    region = project_metadata.get("region", "")
+    commune = project_metadata.get("commune", "")
+    zone_code = new_doc_meta_dict.get("zona_prc") or meta.get("zona_prc") or meta.get("zona") or meta.get("zona_regulador")
+    
+    if commune:
+        try:
+            from knowledge.prc.registry import extract_prc_context_for_prompt
+            prc_context = extract_prc_context_for_prompt(region=region, commune=commune, zone_code=zone_code)
+            if prc_context:
+                prompt += (
+                    "--- ORDENANZA LOCAL (PLAN REGULADOR COMUNAL) ---\n"
+                    f"{prc_context}\n\n"
+                )
+        except Exception as prc_err:
+            print(f"Advertencia consolidando PRC para {commune}: {prc_err}")
+
     prompt += (
         "--- CONTEXTO ACUMULADO PREVIO ---\n"
         f"{existing_context}\n\n"
@@ -339,13 +396,15 @@ def consolidate_project_context(
         "--- INSTRUCCIONES ---\n"
         "1. **Actualiza el Contexto Acumulado:** Redacta un texto fluido que integre los nuevos detalles (ej: si el nuevo documento es un plano de cortes y antes solo teníamos la ETT).\n"
         "2. **Resuelve Infracciones Previas:** Analiza si los nuevos datos o el nuevo plano justifican/sanan alguna alerta anterior. Si es así, elimínala de las infracciones consolidadas.\n"
-        "3. **Agrega Nuevas Infracciones:** Si el nuevo documento contiene nuevas fallas normativas que no estaban documentadas, agrégalas a la lista.\n"
-        "4. **Combina Metadatos:** Unifica los metadatos anteriores con los del nuevo archivo.\n"
+        "3. **Agrega Nuevas Infracciones:** Si el nuevo documento contiene nuevas fallas normativas que no estaban documentadas (sea a la OGUC o a la Ordenanza Local comunal), agrégalas a la lista.\n"
+        "4. **Combina Metadatos:** Unifica los metadatos anteriores con los del nuevo archivo (incluyendo 'zona_prc' si fue identificada).\n"
         "5. **Estima la Viabilidad y Justifica:** Recalcula el porcentaje de éxito (0.0 a 100.0) de aprobación final municipal. Si is_valid_project_documentation es False, la viabilidad debe ser 0.0. "
         "Cualquier penalización que deje la viabilidad por debajo del 95% debe estar estrictamente justificada por infracciones en la lista. Si penalizas la viabilidad porque el proyecto aún está incompleto (ej. solo se ha subido el CIP pero faltan los planos de arquitectura o elevaciones indispensables), debes añadir obligatoriamente alertas correspondientes a la lista de infracciones (ej: rule_id='Expediente Incompleto', description='Falta cargar el plano de arquitectura para verificar coeficiente de constructibilidad y alturas', severity='MEDIA' o 'BAJA'). Si el expediente está completo y no hay infracciones detectadas, la viabilidad debe ser del 100%.\n"
         "6. **Valida la Documentación del Proyecto:** Si el nuevo documento tiene is_valid_architectural_doc = False o no tiene relación alguna con edificación/construcción de viviendas, debes marcar is_valid_project_documentation = False; de lo contrario, True.\n"
-        "7. **También señala puntos buenos en tu análisis, reduciendo la información general del proyecto a una sola linea, dando pie a tener un análisis mayor. \n"
-        "8. **Finalmente añade un pequeño punteo sobre qué normas importantes o que la DOM suele aprobar o rechazar más está contemplado en el contexto. \n"
+        "7. **También señala puntos buenos en tu análisis, reduciendo la información general del proyecto a una sola linea, dando pie a tener un análisis mayor.\n"
+        "8. **Añade un pequeño punteo sobre qué normas importantes o que la DOM suele aprobar o rechazar más está contemplado en el contexto (tanto de la OGUC como del Plan Regulador Comunal).\n"
+        "9. **Recomienda el Formulario DOM:** Basado en el tipo de proyecto y las obras identificadas, asigna recommended_dom_form_id a uno de: 'form_1' (Obras Menores), 'form_2' (Obras de Edificación / Obra Nueva), 'form_3' (Obras de Urbanización / Loteos), 'form_4' (Subdivisiones y Fusión Predial), o 'form_5' (Otras Obras / Demoliciones).\n"
+        "10. **Trazabilidad de Inspección Consolidada (inspected_rules):** Unifica y actualiza la lista de verificaciones técnicas del proyecto (tanto conformes 'CUMPLE' como 'NO CUMPLE' y 'ALERTAS'), conservando las fuentes de evidencia y marcando detection_method='Modelo de IA (Gemini Multimodal)'.\n"
     )
 
     response: ConsolidatedProjectEvaluation = client.chat.completions.create(
@@ -353,6 +412,34 @@ def consolidate_project_context(
         response_model=ConsolidatedProjectEvaluation,
         messages=[{"role": "user", "content": prompt}],
     )
+
+    if commune:
+        try:
+            from app.rules_engine import evaluate_prc_numeric_rules
+            prc_findings = evaluate_prc_numeric_rules(
+                project_metadata=new_doc_meta_dict or meta,
+                region=region,
+                commune=commune,
+                zone_code=zone_code
+            )
+            for f in prc_findings:
+                status_map = {"PASS": "CUMPLE", "FAIL": "NO CUMPLE", "WARNING": "ALERTA", "UNVERIFIABLE": "NO VERIFICABLE"}
+                ev_str = str(f.get("evidence", ""))
+                rule_chk = RuleCheck(
+                    rule_id=f.get("norm_ref", "PRC Local"),
+                    category="Zonificación y Alturas",
+                    element_inspected=f.get("title", "Parámetro PRC"),
+                    evidence_found=ev_str if ev_str != "[]" else f.get("notes", ""),
+                    document_source="Cálculo Paramétrico PRC",
+                    status=status_map.get(f.get("status"), "ALERTA"),
+                    detection_method="Motor Determinista PRC",
+                    technical_rationale=f.get("notes", "")
+                )
+                if not any(r.rule_id == rule_chk.rule_id and r.element_inspected == rule_chk.element_inspected for r in response.inspected_rules):
+                    response.inspected_rules.insert(0, rule_chk)
+        except Exception as prc_err:
+            print(f"Advertencia al adjuntar reglas deterministas PRC: {prc_err}")
+
     return response
 
 def rebuild_project_context(project_id: str, jwt_token: str, oguc_text: str) -> Dict[str, Any]:

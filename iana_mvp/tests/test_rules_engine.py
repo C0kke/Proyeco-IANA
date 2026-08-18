@@ -3,7 +3,6 @@ Pruebas Unitarias para el Motor de Reglas OGUC (rules_engine.py).
 Verifica la evaluación lógica de normas respecto al contenido extraído de los planos/documentos.
 """
 
-import pytest
 from app.pdf_extract import TextBlock, normalize_text
 from app.rules_engine import run_rules, top_evidence, load_rules
 
