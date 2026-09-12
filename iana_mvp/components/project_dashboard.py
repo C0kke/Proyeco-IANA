@@ -105,7 +105,7 @@ def render_audit_and_traceability_tab(project: dict, docs: list):
                 "evidence_found": inf.get("evidence", "Detectado en análisis"),
                 "document_source": "Expediente del proyecto",
                 "status": "NO CUMPLE" if inf.get("severity") == "ALTA" else "ALERTA",
-                "detection_method": "Modelo de IA (Gemini Multimodal)",
+                "detection_method": "Modelo de IANA",
                 "technical_rationale": inf.get("justification", inf.get("description", ""))
             })
             
@@ -417,35 +417,6 @@ def display_results(result_data):
     if "has_dom_prerequisites" in result_data:
         has_dom_prereqs = result_data["has_dom_prerequisites"]
 
-    if has_dom_prereqs:
-        rec_id = result_data.get("dom_form", {}).get("form_id") if isinstance(result_data.get("dom_form"), dict) else None
-        render_dom_forms_section(
-            project_metadata={"name": result_data.get("project_name")},
-            context_text=result_data.get("summary_notes", ""),
-            ai_recommendation_id=rec_id,
-            job_id_suffix=result_data.get("job_id", "res")
-        )
-    else:
-        st.markdown(
-            """
-            <div style="background-color: #1A1A1A; border: 1px solid #333333; border-left: 5px solid #D4AF37; border-radius: 8px; padding: 18px; margin-top: 15px; margin-bottom: 20px;">
-                <div style="font-size: 15px; font-weight: 700; color: #D4AF37; margin-bottom: 6px;">
-                    Formulario de Ingreso DOM (Requiere Documentación Mínima)
-                </div>
-                <div style="font-size: 13px; color: #FFFFFF; line-height: 1.5;">
-                    Para determinar el formulario de ingreso a la DOM (Dirección de Obras Municipales) y habilitar su descarga, 
-                    el proyecto debe contar obligatoriamente con los siguientes 3 documentos cargados:
-                    <ul style="margin: 8px 0 0 18px; padding: 0; color: #B0B0BD;">
-                        <li>Certificado de Informaciones Previas (CIP)</li>
-                        <li>Especificaciones Técnicas (ETT)</li>
-                        <li>Plano de Arquitectura</li>
-                    </ul>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
     st.subheader("Detalle de Infracciones de la OGUC", anchor=False)
     
     if infractions:
@@ -718,7 +689,7 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                     if not plan_text.strip():
                         raise ValueError("El archivo no contiene texto legible (sin capa de texto OCR o archivo vacío).")
                         
-                    with st.spinner("Realizando análisis individual de este documento (Gemini AI)..."):
+                    with st.spinner("Realizando análisis..."):
                         meta_dict = p.get("extracted_metadata") if isinstance(p.get("extracted_metadata"), dict) else {}
                         doc_analysis = evaluate_document_individually(
                             doc_text=plan_text,

@@ -19,7 +19,7 @@ IANA no depende exclusivamente de un modelo generativo; utiliza una arquitectura
                    v                         v                         v
         +--------------------+    +--------------------+    +--------------------+
         |  CIENCIA DE DATOS  |    |     MODELO IANA    |    |  MOTOR PARAMÉTRICO |
-        |   (Regex / NLP)    |    | (Gemini Multimodal)|    |        PRC         |
+        |   (Regex / NLP)    |    |                    |    |        PRC         |
         +--------------------+    +--------------------+    +--------------------+
         | • Extracción de    |    | • Inspección visual|    | • Constructibilidad|
         |   bloques y texto  |    |   de láminas PDF   |    | • Ocupación suelo  |
@@ -121,4 +121,3 @@ streamlit run streamlit_app.py
 ```bash
 & "..\.venv\Scripts\pytest.exe"
 ```
-*(Suite completa de 59 pruebas unitarias automatizadas con 100% de éxito).*

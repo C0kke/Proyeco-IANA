@@ -273,7 +273,7 @@ async def upload_pdf(
                         "description": f"No se pudo completar el análisis normativo por IA debido a un error: {str(e)}",
                         "severity": "ALTA",
                         "evidence": "N/A",
-                        "justification": "Fallo de comunicación con la API de Gemini o Instructor."
+                        "justification": "Fallo de comunicación con IANA."
                     }
                 ],
                 "summary_notes": "Error crítico al procesar la verificación por Inteligencia Artificial."
