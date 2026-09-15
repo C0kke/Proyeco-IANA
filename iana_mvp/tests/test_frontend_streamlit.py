@@ -18,7 +18,9 @@ def test_streamlit_app_initialization():
     CASO COMÚN: Verificar que la aplicación de Streamlit se inicie correctamente,
     configure la página y cargue las claves por defecto en session_state.
     """
-    at = AppTest.from_file("streamlit_app.py", default_timeout=10)
+    import os
+    script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "streamlit_app.py")
+    at = AppTest.from_file(script_path, default_timeout=10)
     at.run(timeout=10)
     
     # Verificar que el session_state se haya inicializado con los valores por defecto

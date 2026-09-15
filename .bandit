@@ -1,0 +1,3 @@
+[bandit]
+exclude: /tests,*/tests/*,iana_mvp/tests
+skips: B101
