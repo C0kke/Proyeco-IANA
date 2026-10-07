@@ -94,3 +94,84 @@ def test_render_pdf_report_bytes(sample_report_data):
     pdf_bytes = render_pdf_report("Plano_v1.pdf", sample_report_data)
     assert isinstance(pdf_bytes, bytes)
     assert pdf_bytes.startswith(b"%PDF")
+
+
+# ==============================================================================
+# 4. PRUEBAS DE ESTILOS CORPORATIVOS Y AUDITORÍA POSITIVA EN HTML
+# ==============================================================================
+
+def test_render_html_report_includes_positive_rules(sample_report_data):
+    """
+    Verifica que el reporte HTML incluya las verificaciones positivas ('✔ CUMPLE')
+    y la sección de trazabilidad y auditoría técnica.
+    """
+    html = render_html_report("Plano_v1.pdf", sample_report_data)
+    assert "Auditoría Técnica y Trazabilidad Normativa" in html
+    assert "✔ CUMPLE" in html
+    assert "Art. 4.1.7 OGUC" in html
+    assert "Ciencia de Datos" in html
+
+
+def test_render_html_report_corporate_styling_tokens(sample_report_data):
+    """
+    Verifica que el reporte HTML contenga los estilos corporativos acordes a index.css:
+    fuentes Orbitron y Raleway, métricas y badges de trazabilidad.
+    """
+    html = render_html_report("Plano_v1.pdf", sample_report_data)
+    assert "Orbitron" in html
+    assert "Raleway" in html
+    assert "--brand-negro-profundo" in html
+    assert "--brand-dorado" in html
+    assert "Inspecciones Totales" in html
+    assert "Conformes (CUMPLE)" in html
+
+
+def test_render_html_report_custom_inspected_rules():
+    """
+    Verifica el renderizado de un conjunto explícito de inspected_rules con conformidades y alertas.
+    """
+    custom_data = {
+        "filename": "casa_alerce.pdf",
+        "project_name": "Casa Alerce Calbuco",
+        "success_probability": 65.0,
+        "observaciones": "Observación de prueba",
+        "summary_notes": "Resumen ejecutivo del proyecto.",
+        "infractions": [
+            {
+                "rule_id": "Art. 55 LGUC",
+                "description": "Predio en área rural",
+                "severity": "ALTA",
+                "evidence": "CIP rural",
+                "justification": "Exige autorización SEREMI."
+            }
+        ],
+        "inspected_rules": [
+            {
+                "rule_id": "Art. 55 LGUC",
+                "category": "Zonificación",
+                "element_inspected": "Predio rural sin informe",
+                "evidence_found": "CIP rural",
+                "document_source": "Expediente del proyecto",
+                "status": "NO CUMPLE",
+                "detection_method": "Modelo IANA",
+                "technical_rationale": "Debe contar con autorización."
+            },
+            {
+                "rule_id": "Art. 4.1.7 OGUC",
+                "category": "Accesibilidad",
+                "element_inspected": "Ancho de puerta principal",
+                "evidence_found": "0.90 m en lámina A1",
+                "document_source": "Plano A1",
+                "status": "CUMPLE",
+                "detection_method": "Ciencia de Datos (Regex / NLP)",
+                "technical_rationale": "Conforme a norma de accesibilidad."
+            }
+        ]
+    }
+    html = render_html_report("casa_alerce.pdf", custom_data)
+    assert "Casa Alerce Calbuco" in html
+    assert "✖ NO CUMPLE" in html
+    assert "✔ CUMPLE" in html
+    assert "Ancho de puerta principal" in html
+    assert "Predio rural sin informe" in html
+    assert "65.0%" in html
