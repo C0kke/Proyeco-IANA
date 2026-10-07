@@ -20,7 +20,7 @@ from app.ai_verifier import (
     evaluate_document_individually,
     consolidate_project_context
 )
-from app.report import render_html_report, render_pdf_report
+from app.report import render_html_report, render_pdf_report, build_or_extract_inspected_rules
 from app.dom_forms import determine_dom_form, DOM_FORMS_CATALOG, get_form_pdf_bytes
 from components.dialogs import render_edit_project_modal, confirm_delete_document, render_delete_project_modal
 from app.assets import get_asset_base64
@@ -91,76 +91,7 @@ def render_audit_and_traceability_tab(project: dict, docs: list):
         "por el **Modelo Multimodal (Gemini)** o por el **Motor Paramétrico PRC**."
     )
     
-    meta = project.get("extracted_metadata") if isinstance(project.get("extracted_metadata"), dict) else {}
-    inspected_rules = list(meta.get("inspected_rules") or [])
-    
-    # Si aún no hay inspected_rules guardadas, construirlas a partir del contexto existente
-    if not inspected_rules:
-        infrs = project.get("consolidated_infractions") or []
-        for inf in infrs:
-            inspected_rules.append({
-                "rule_id": inf.get("rule_id", "OGUC"),
-                "category": "Infracción Normativa",
-                "element_inspected": inf.get("description", "Elemento constructivo")[:70],
-                "evidence_found": inf.get("evidence", "Detectado en análisis"),
-                "document_source": "Expediente del proyecto",
-                "status": "NO CUMPLE" if inf.get("severity") == "ALTA" else "ALERTA",
-                "detection_method": "Modelo de IANA",
-                "technical_rationale": inf.get("justification", inf.get("description", ""))
-            })
-            
-        commune = project.get("commune", "")
-        region = project.get("region", "")
-        zone_code = meta.get("zona_prc") or meta.get("zona")
-        if commune:
-            try:
-                from app.rules_engine import evaluate_prc_numeric_rules
-                prc_res = evaluate_prc_numeric_rules(meta, region, commune, zone_code)
-                for prc in prc_res:
-                    s_map = {"PASS": "CUMPLE", "FAIL": "NO CUMPLE", "WARNING": "ALERTA", "UNVERIFIABLE": "NO VERIFICABLE"}
-                    inspected_rules.append({
-                        "rule_id": prc.get("norm_ref", "PRC Local"),
-                        "category": "Zonificación y Alturas",
-                        "element_inspected": prc.get("title", "Parámetro PRC"),
-                        "evidence_found": str(prc.get("evidence", "")),
-                        "document_source": "Cálculo Paramétrico PRC",
-                        "status": s_map.get(prc.get("status"), "ALERTA"),
-                        "detection_method": "Motor Determinista PRC",
-                        "technical_rationale": prc.get("notes", "")
-                    })
-            except Exception:
-                pass
-
-        inspected_rules.append({
-            "rule_id": "Art. 4.1.7 OGUC",
-            "category": "Accesibilidad y Puertas",
-            "element_inspected": "Ancho libre de paso en puertas de acceso principal (0.90 m)",
-            "evidence_found": "Cotas de vanos de acceso principal verificadas",
-            "document_source": "Plano de arquitectura / ETT",
-            "status": "CUMPLE",
-            "detection_method": "Ciencia de Datos (Regex / NLP)",
-            "technical_rationale": "El expediente contempla vanos de acceso principal con dimensiones mínimas conformes a la OGUC."
-        })
-        inspected_rules.append({
-            "rule_id": "Art. 4.1.2 OGUC",
-            "category": "Habitabilidad y Ventilación",
-            "element_inspected": "Iluminación natural directa en recintos habitables",
-            "evidence_found": "Ventanas al exterior en recintos de permanencia",
-            "document_source": "Plano de arquitectura",
-            "status": "CUMPLE",
-            "detection_method": "Modelo de IA (Gemini Multimodal)",
-            "technical_rationale": "Todos los dormitorios y áreas de estar cuentan con vanos hacia patios o espacio público."
-        })
-        inspected_rules.append({
-            "rule_id": "Art. 2.6.3 OGUC",
-            "category": "Rasantes y Distanciamientos",
-            "element_inspected": "Distanciamiento a medianeros y aplicación de rasantes",
-            "evidence_found": "Retranqueos laterales y rasante angular según región",
-            "document_source": "Plano de arquitectura y cortes",
-            "status": "CUMPLE",
-            "detection_method": "Modelo de IA (Gemini Multimodal)",
-            "technical_rationale": "El volumen edificado no supera el plano teórico de rasantes respecto a predios colindantes."
-        })
+    inspected_rules = build_or_extract_inspected_rules(project=project)
 
     # Estadísticas
     total_count = len(inspected_rules)
@@ -379,11 +310,15 @@ def display_results(result_data):
             value=status_value,
         )
         
+    active_p = st.session_state.get("active_project")
+    if not result_data.get("inspected_rules"):
+        result_data["inspected_rules"] = build_or_extract_inspected_rules(result=result_data, project=active_p)
+
     col_dl1, col_dl2 = st.columns(2)
     with col_dl1:
         st.download_button(
             label="Descargar Tabla de Infracciones",
-            data=render_html_report(result_data.get("filename", "proyecto.pdf"), result_data),
+            data=render_html_report(result_data.get("filename", "proyecto.pdf"), result_data, project=active_p),
             file_name=f"reporte_iana_{result_data.get('job_id', 'proyecto')}.html",
             mime="text/html",
             key=f"dl_html_top_btn_{result_data.get('job_id', 'main')}",
@@ -435,7 +370,7 @@ def display_results(result_data):
 
     st.subheader("Descargar Reportes", anchor=False)
     
-    html_content = render_html_report(result_data["filename"], result_data)
+    html_content = render_html_report(result_data["filename"], result_data, project=active_p)
     try:
         pdf_content = render_pdf_report(result_data["filename"], result_data)
     except Exception as e:
@@ -803,7 +738,8 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                         "summary_notes": consolidated.consolidated_context,
                         "observaciones": p_obs.strip(),
                         "has_dom_prerequisites": eval_has_dom_prereqs,
-                        "dom_form": dom_form
+                        "dom_form": dom_form,
+                        "inspected_rules": [r.model_dump() for r in consolidated.inspected_rules]
                     }
                     
                     out_json = os.path.join(results_dir, f"{job_id}.json")
@@ -812,7 +748,7 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                         
                     out_html = os.path.join(results_dir, f"{job_id}.html")
                     with open(out_html, "w", encoding="utf-8") as handle:
-                        handle.write(render_html_report(uploaded_file.name, result_data))
+                        handle.write(render_html_report(uploaded_file.name, result_data, project=p))
                         
                     if db_res.get("storage_location") == "local_fallback":
                         st.warning("No se pudo conectar con el storage remoto. El archivo se guardó localmente en modo fallback de emergencia y el análisis continuará normalmente.")
@@ -860,7 +796,8 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                 "summary_notes": p.get("consolidated_context", "Sin notas del análisis."),
                 "observaciones": meta.get("observations", ""),
                 "has_dom_prerequisites": has_dom_p,
-                "user_id": st.session_state["user"].id
+                "user_id": st.session_state["user"].id,
+                "inspected_rules": list(meta.get("inspected_rules") or [])
             }
             display_results(result_data)
                 
