@@ -35,3 +35,4 @@ temp_interactive_push.bat
 .gitignore
 DATABASE_PROPOSAL.md
 AIMODEL_PROPOSAL.md
+node_modules
