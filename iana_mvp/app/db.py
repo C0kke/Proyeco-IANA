@@ -1,5 +1,6 @@
 import os
 import logging
+import mimetypes
 from typing import Dict, Any, List, Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -12,6 +13,10 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
 SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
+
+# Definición segura del directorio de datos de la aplicación
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
 
 if not SUPABASE_URL or not SUPABASE_PUBLISHABLE_KEY or not SUPABASE_SECRET_KEY:
     logger.warning("Faltan variables de entorno de Supabase en el archivo .env. La integración podría fallar.")
@@ -146,11 +151,15 @@ def upload_project_document(
     bucket_path = f"{user_id}/{project_id}/{document_type}/{safe_filename}"
     user_client = get_supabase_client(jwt_token)
     
+    # Detección dinámica de MIME type (PDF, docx, etc.)
+    mime_type, _ = mimetypes.guess_type(safe_filename)
+    content_type = mime_type if mime_type else "application/pdf"
+    
     try:
         user_client.storage.from_(bucket_name).upload(
             path=bucket_path,
             file=file_bytes,
-            file_options={"content-type": "application/pdf", "x-upsert": "true"}
+            file_options={"content-type": content_type, "x-upsert": "true"}
         )
         doc_record = {
             "project_id": project_id,
@@ -185,12 +194,7 @@ def upload_project_document(
             return {"success": False, "error": "No se pudo verificar el acceso al proyecto."}
 
         try:
-            local_fallback_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                "data", 
-                "uploads", 
-                "fallback"
-            )
+            local_fallback_dir = os.path.join(DATA_DIR, "uploads", "fallback")
             os.makedirs(local_fallback_dir, exist_ok=True)
             local_file_path = os.path.join(local_fallback_dir, f"{project_id}_{safe_filename}")
             
@@ -275,7 +279,7 @@ def delete_project_document(doc_id: str, jwt_token: str) -> Dict[str, Any]:
         if bucket_path:
             if bucket_path.startswith("local://fallback/"):
                 filename = os.path.basename(bucket_path.replace("local://fallback/", ""))
-                local_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "uploads", "fallback", filename)
+                local_path = os.path.join(DATA_DIR, "uploads", "fallback", filename)
                 if os.path.exists(local_path):
                     try:
                         os.remove(local_path)
@@ -287,6 +291,12 @@ def delete_project_document(doc_id: str, jwt_token: str) -> Dict[str, Any]:
                 except Exception as storage_err:
                     logger.error(f"Error al borrar archivo del storage de Supabase: {storage_err}")
                     
+        # Borrado preventivo en document_analyses si existe
+        try:
+            client.table("document_analyses").delete().eq("document_id", doc_id).execute()
+        except Exception as da_err:
+            logger.info(f"Sin análisis asociados o limpiados en cascada: {da_err}")
+
         client.table("documents").delete().eq("id", doc_id).execute()
         return {"success": True}
     except Exception as e:
@@ -296,15 +306,22 @@ def delete_project_document(doc_id: str, jwt_token: str) -> Dict[str, Any]:
 def delete_project(project_id: str, jwt_token: str) -> Dict[str, Any]:
     client = get_supabase_client(jwt_token)
     try:
-        docs_res = client.table("documents").select("bucket_path").eq("project_id", project_id).execute()
+        docs_res = client.table("documents").select("id, bucket_path").eq("project_id", project_id).execute()
         docs = docs_res.data or []
         
         for doc in docs:
+            doc_id = doc.get("id")
+            if doc_id:
+                try:
+                    client.table("document_analyses").delete().eq("document_id", doc_id).execute()
+                except Exception:
+                    pass
+            
             bucket_path = doc.get("bucket_path", "")
             if bucket_path:
                 if bucket_path.startswith("local://fallback/"):
                     filename = os.path.basename(bucket_path.replace("local://fallback/", ""))
-                    local_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "uploads", "fallback", filename)
+                    local_path = os.path.join(DATA_DIR, "uploads", "fallback", filename)
                     if os.path.exists(local_path):
                         try:
                             os.remove(local_path)
@@ -316,6 +333,7 @@ def delete_project(project_id: str, jwt_token: str) -> Dict[str, Any]:
                     except Exception as storage_err:
                         logger.error(f"Error al borrar del storage remoto en delete_project: {storage_err}")
                         
+        client.table("documents").delete().eq("project_id", project_id).execute()
         client.table("projects").delete().eq("id", project_id).execute()
         return {"success": True}
     except Exception as e:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 from jinja2 import Template
 
@@ -50,9 +50,7 @@ HTML_TMPL = Template(
       --method-iana-text: #d8b4fe;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -69,7 +67,6 @@ HTML_TMPL = Template(
       margin: 0 auto;
     }
 
-    /* Encabezado Principal */
     .report-header {
       display: flex;
       justify-content: space-between;
@@ -126,7 +123,6 @@ HTML_TMPL = Template(
       letter-spacing: -0.5px;
     }
 
-    /* Barra de Metadatos */
     .meta-bar {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -182,6 +178,66 @@ HTML_TMPL = Template(
       font-weight: 700;
     }
 
+    /* Caja de Desglose Matemático del Puntaje */
+    .breakdown-card {
+      background-color: var(--brand-card);
+      border: 1px solid var(--border-color);
+      border-left: 4px solid var(--brand-dorado);
+      border-radius: 8px;
+      padding: 18px 20px;
+      margin-bottom: 28px;
+    }
+
+    .breakdown-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--brand-dorado);
+      margin: 0 0 12px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .breakdown-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .breakdown-step {
+      background-color: var(--brand-carbon);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 12px 14px;
+    }
+
+    .breakdown-step-title {
+      font-size: 11px;
+      color: var(--brand-acero);
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .breakdown-step-val {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .val-positive { color: var(--cumple-text); }
+    .val-negative { color: var(--nocumple-text); }
+    .val-final { color: var(--brand-dorado); }
+
+    .breakdown-explanation {
+      font-size: 12.5px;
+      color: var(--brand-plata);
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+
     /* Cajas de Observaciones y Resumen */
     .summary-box {
       border-radius: 8px;
@@ -201,7 +257,6 @@ HTML_TMPL = Template(
       font-weight: 700;
       color: var(--brand-dorado);
       margin: 0 0 8px 0;
-      letter-spacing: 0.3px;
     }
 
     .obs-box p {
@@ -223,7 +278,6 @@ HTML_TMPL = Template(
       font-weight: 700;
       color: var(--brand-blanco);
       margin: 0 0 8px 0;
-      letter-spacing: 0.3px;
     }
 
     .exec-box p {
@@ -234,7 +288,6 @@ HTML_TMPL = Template(
       white-space: pre-line;
     }
 
-    /* Cuadrícula de Métricas de Auditoría */
     .metrics-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -243,9 +296,7 @@ HTML_TMPL = Template(
     }
 
     @media (max-width: 820px) {
-      .metrics-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); }
     }
 
     .metric-card {
@@ -276,14 +327,12 @@ HTML_TMPL = Template(
     .metric-nocumple { color: var(--nocumple-text); }
     .metric-alerta { color: var(--alerta-text); }
 
-    /* Secciones */
     .section-heading {
       font-family: 'Orbitron', sans-serif;
       font-size: 18px;
       font-weight: 700;
       color: var(--brand-blanco);
       margin: 0 0 6px 0;
-      letter-spacing: -0.3px;
     }
 
     .section-subtext {
@@ -293,7 +342,6 @@ HTML_TMPL = Template(
       line-height: 1.5;
     }
 
-    /* Tabla Corporativa de Infracciones */
     .table-responsive {
       overflow-x: auto;
       border: 1px solid var(--border-color);
@@ -316,7 +364,6 @@ HTML_TMPL = Template(
       font-weight: 600;
       font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
       border-bottom: 1px solid var(--border-color);
     }
 
@@ -325,10 +372,6 @@ HTML_TMPL = Template(
       border-bottom: 1px solid var(--border-color);
       vertical-align: top;
       color: #e4e4e7;
-    }
-
-    table.corporate-table tr:last-child td {
-      border-bottom: none;
     }
 
     .badge-severity {
@@ -353,7 +396,6 @@ HTML_TMPL = Template(
       background-color: var(--brand-card);
     }
 
-    /* Barra de Filtros de Auditoría */
     .filter-bar {
       display: flex;
       align-items: center;
@@ -393,7 +435,6 @@ HTML_TMPL = Template(
       color: var(--brand-dorado);
     }
 
-    /* Tarjetas de Auditoría y Trazabilidad */
     .audit-cards-wrapper {
       display: flex;
       flex-direction: column;
@@ -409,9 +450,7 @@ HTML_TMPL = Template(
       transition: border-color 0.15s ease;
     }
 
-    .audit-item-card:hover {
-      border-color: #3f3f46;
-    }
+    .audit-item-card:hover { border-color: #3f3f46; }
 
     .border-cumple { border-left: 4px solid var(--cumple-border) !important; }
     .border-nocumple { border-left: 4px solid var(--nocumple-border) !important; }
@@ -469,6 +508,18 @@ HTML_TMPL = Template(
     .badge-status-nocumple { background-color: var(--nocumple-bg); color: var(--nocumple-text); }
     .badge-status-alerta { background-color: var(--alerta-bg); color: var(--alerta-text); }
 
+    /* Badges de Impacto Porcentual */
+    .badge-impact {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .badge-impact-pos { background-color: #064e3b; color: #34d399; border: 1px solid #059669; }
+    .badge-impact-neg { background-color: #450a0a; color: #f87171; border: 1px solid #dc2626; }
+    .badge-impact-neu { background-color: #27272a; color: #a1a1aa; border: 1px solid #3f3f46; }
+
     .audit-evidence-line {
       font-size: 12px;
       color: #d4d4d8;
@@ -498,7 +549,6 @@ HTML_TMPL = Template(
       font-size: 11.5px;
     }
 
-    /* Pie de Página */
     .report-footer {
       border-top: 1px solid var(--border-color);
       padding-top: 20px;
@@ -517,30 +567,10 @@ HTML_TMPL = Template(
       font-weight: 700;
       color: var(--brand-dorado);
     }
-
-    /* Estilos para Impresión */
-    @media print {
-      body {
-        background-color: #0A0A0A !important;
-        color: #FFFFFF !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        padding: 0 !important;
-      }
-      .filter-bar {
-        display: none !important;
-      }
-      .audit-item-card, .metric-card, .obs-box, .exec-box, table.corporate-table tr {
-        break-inside: avoid;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-    }
   </style>
 </head>
 <body>
   <div class="report-container">
-    <!-- Encabezado con Logo y Sello -->
     <header class="report-header">
       <div class="brand-logo-container">
         {% if logo_b64 %}
@@ -554,10 +584,8 @@ HTML_TMPL = Template(
       </div>
     </header>
 
-    <!-- Título Principal -->
     <h1 class="main-title">Informe preliminar — IANA</h1>
 
-    <!-- Barra de Metadatos -->
     <div class="meta-bar">
       <div class="meta-item">
         <span class="meta-label">Archivo Analizado</span>
@@ -579,7 +607,34 @@ HTML_TMPL = Template(
       </div>
     </div>
 
-    <!-- Observaciones / Contexto del Documento -->
+    <!-- MÓDULO DE UX: DESGLOSE MATEMÁTICO DE LA VIABILIDAD -->
+    <div class="breakdown-card">
+      <div class="breakdown-title">
+        <span>📊 Trazabilidad y Cadena de Cálculo de Viabilidad</span>
+      </div>
+      <p class="breakdown-explanation">
+        Explicación detallada de cómo se calcula la probabilidad final del expediente. La línea base inicia en el <b>100%</b> y ajusta según las conformidades comprobadas y las infracciones o vacíos normativos detectados al ingestar los documentos.
+      </p>
+      <div class="breakdown-grid">
+        <div class="breakdown-step">
+          <div class="breakdown-step-title">1. Línea Base Teórica</div>
+          <div class="breakdown-step-val">100.0%</div>
+        </div>
+        <div class="breakdown-step">
+          <div class="breakdown-step-title">2. Aportes / Convalidado (+)</div>
+          <div class="breakdown-step-val val-positive">+{{ "%.1f"|format(score_breakdown.total_additions) }}%</div>
+        </div>
+        <div class="breakdown-step">
+          <div class="breakdown-step-title">3. Penalizaciones (-)</div>
+          <div class="breakdown-step-val val-negative">-{{ "%.1f"|format(score_breakdown.total_deductions) }}%</div>
+        </div>
+        <div class="breakdown-step">
+          <div class="breakdown-step-title">4. Viabilidad Resultante</div>
+          <div class="breakdown-step-val val-final">{{ "%.1f"|format(result.success_probability) }}%</div>
+        </div>
+      </div>
+    </div>
+
     {% if result.observaciones %}
     <div class="summary-box obs-box">
       <h3>Observaciones / Contexto del Documento:</h3>
@@ -587,7 +642,6 @@ HTML_TMPL = Template(
     </div>
     {% endif %}
 
-    <!-- Resumen Ejecutivo -->
     {% if result.summary_notes %}
     <div class="summary-box exec-box">
       <h3>Resumen Ejecutivo:</h3>
@@ -595,7 +649,6 @@ HTML_TMPL = Template(
     </div>
     {% endif %}
 
-    <!-- Métricas de Auditoría -->
     <div class="metrics-grid">
       <div class="metric-card">
         <div class="metric-label">Inspecciones Totales</div>
@@ -615,7 +668,6 @@ HTML_TMPL = Template(
       </div>
     </div>
 
-    <!-- Sección 1: Infracciones Identificadas (OGUC) -->
     <h2 class="section-heading">Infracciones Identificadas (OGUC)</h2>
     <div class="table-responsive">
       <table class="corporate-table">
@@ -652,14 +704,11 @@ HTML_TMPL = Template(
       </table>
     </div>
 
-    <!-- Sección 2: Auditoría Técnica y Trazabilidad Normativa (Positivas y Negativas) -->
     <h2 class="section-heading">Auditoría Técnica y Trazabilidad Normativa</h2>
     <p class="section-subtext">
-      Registro de verificación transparente de cada elemento arquitectónico y regla legal inspeccionada en el expediente. 
-      Identifica si el cumplimiento fue verificado por <b>Ciencia de Datos (Regex / NLP)</b>, por el <b>Modelo Multimodal (Gemini)</b> o por el <b>Motor Paramétrico PRC</b>.
+      Registro de verificación transparente de cada elemento arquitectónico. Muestra el método de inspección y el <b>impacto porcentual exacto</b> que cada regla aporta o descuenta a la viabilidad del proyecto.
     </p>
 
-    <!-- Filtros Interactivos -->
     <div class="filter-bar">
       <span class="filter-label">Filtrar por Cumplimiento:</span>
       <button class="filter-btn active" onclick="filterAuditCards(this, 'all')">Todos ({{ stats.total }})</button>
@@ -668,7 +717,6 @@ HTML_TMPL = Template(
       <button class="filter-btn" onclick="filterAuditCards(this, 'ALERTA')">⚠ Alertas ({{ stats.alerta }})</button>
     </div>
 
-    <!-- Tarjetas de Auditoría -->
     <div class="audit-cards-wrapper" id="auditCardsWrapper">
       {% for item in inspected_rules %}
       <div class="audit-item-card border-{{ item.status_class }}" data-status="{{ item.status_category }}">
@@ -678,6 +726,7 @@ HTML_TMPL = Template(
             <span class="audit-rule-code">({{ item.rule_id }})</span>
           </div>
           <div class="audit-badges-group">
+            <span class="badge-impact {{ item.impact_class }}">{{ item.impact_label }}</span>
             <span class="badge-method {{ item.method_class }}">{{ item.method_label }}</span>
             <span class="badge-status {{ item.status_badge_class }}">{{ item.status_icon }} {{ item.status }}</span>
           </div>
@@ -694,7 +743,6 @@ HTML_TMPL = Template(
       {% endfor %}
     </div>
 
-    <!-- Pie de Página -->
     <footer class="report-footer">
       <div>
         <span class="footer-brand-title">IANA</span> &middot; Inteligencia Artificial Normativa para Arquitectura
@@ -742,205 +790,34 @@ PDF_TMPL = Template(
   <meta charset="utf-8"/>
   <title>Informe IANA v0.1</title>
   <style>
-    @page {
-      size: letter;
-      margin: 0.8in;
-    }
-    
-    body {
-      font-family: Arial, sans-serif;
-      color: #333333;
-      font-size: 9.5px;
-      line-height: 1.35;
-      margin: 0;
-      padding: 0;
-    }
-    
-    .page-break {
-      page-break-before: always;
-      break-before: page;
-      clear: both;
-    }
-    
-    .cover-page {
-      position: relative;
-      height: 100%;
-      box-sizing: border-box;
-      padding-top: 120px;
-    }
-    
-    .cover-title {
-      font-size: 28px;
-      font-weight: bold;
-      color: #0d47a1;
-      margin-bottom: 8px;
-      text-align: center;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    
-    .cover-subtitle {
-      font-size: 14px;
-      color: #555555;
-      margin-bottom: 120px;
-      text-align: center;
-      font-weight: normal;
-    }
-    
-    .cover-meta {
-      width: 60%;
-      margin-left: auto;
-      margin-right: 0;
-      text-align: left;
-      background: transparent;
-      padding: 0;
-      border: none;
-      box-sizing: border-box;
-      font-size: 9px;
-    }
-    
-    .cover-meta p {
-      margin: 5px 0;
-      color: #444444;
-    }
-    
-    .section-title {
-      font-size: 12px;
-      font-weight: bold;
-      color: #0d47a1;
-      margin-top: 0;
-      margin-bottom: 12px;
-      border-bottom: 1.5px solid #0d47a1;
-      padding-bottom: 4px;
-      text-transform: uppercase;
-      text-align: left;
-    }
-    
-    .metrics-table {
-      width: 100%;
-      border-collapse: collapse;
-      border: none !important;
-      margin-bottom: 15px;
-    }
-    
-    .metrics-table td {
-      width: 33.33%;
-      border: none !important;
-      padding: 6px 4px;
-      text-align: center;
-      background: transparent !important;
-    }
-    
-    .metric-label {
-      font-size: 8px;
-      color: #666666;
-      text-transform: uppercase;
-      font-weight: bold;
-      margin-bottom: 4px;
-    }
-    
-    .metric-value {
-      font-size: 15px;
-      font-weight: bold;
-      color: #111111;
-    }
-    
-    .summary-box {
-      margin-top: 15px;
-      margin-bottom: 15px;
-      line-height: 1.4;
-      font-size: 9px;
-    }
-    
-    .summary-box h3 {
-      margin-top: 0;
-      margin-bottom: 6px;
-      font-size: 10px;
-      color: #0d47a1;
-      text-transform: uppercase;
-      font-weight: bold;
-    }
-    
-    .summary-text {
-      white-space: pre-line;
-      margin: 0;
-      color: #444444;
-    }
-    
-    .infraction-list {
-      margin-top: 10px;
-    }
-    
-    .infraction-item {
-      border-bottom: 1px solid #e0e0e0;
-      padding-top: 8px;
-      padding-bottom: 8px;
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-    
-    .infraction-header {
-      overflow: hidden;
-      margin-bottom: 6px;
-    }
-    
-    .infraction-rule {
-      font-size: 11px;
-      font-weight: bold;
-      color: #0d47a1;
-      float: left;
-    }
-    
-    .infraction-severity-container {
-      float: right;
-    }
-    
-    .infraction-detail {
-      margin-top: 4px;
-      font-size: 9px;
-      color: #333333;
-      clear: both;
-    }
-    
-    .infraction-detail p {
-      margin: 4px 0;
-    }
-    
-    .badge {
-      display: inline-block;
-      padding: 2px 5px;
-      border-radius: 3px;
-      font-size: 8px;
-      font-weight: bold;
-      text-align: center;
-    }
-    
-    .badge-alta {
-      background-color: #ffebee;
-      color: #c62828;
-      border: 1px solid #ffcdd2;
-    }
-    
-    .badge-media {
-      background-color: #fff3e0;
-      color: #ef6c00;
-      border: 1px solid #ffe0b2;
-    }
-    
-    .badge-baja {
-      background-color: #e3f2fd;
-      color: #1565c0;
-      border: 1px solid #bbdefb;
-    }
-    
-    code {
-      font-family: Consolas, Monaco, monospace;
-      background: #f5f5f5;
-      padding: 1px 3px;
-      border: 1px solid #e0e0e0;
-      border-radius: 3px;
-      font-size: 8px;
-    }
+    @page { size: letter; margin: 0.8in; }
+    body { font-family: Arial, sans-serif; color: #333333; font-size: 9.5px; line-height: 1.35; margin: 0; padding: 0; }
+    .page-break { page-break-before: always; break-before: page; clear: both; }
+    .cover-page { position: relative; height: 100%; box-sizing: border-box; padding-top: 120px; }
+    .cover-title { font-size: 28px; font-weight: bold; color: #0d47a1; margin-bottom: 8px; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
+    .cover-subtitle { font-size: 14px; color: #555555; margin-bottom: 120px; text-align: center; font-weight: normal; }
+    .cover-meta { width: 60%; margin-left: auto; margin-right: 0; text-align: left; font-size: 9px; }
+    .cover-meta p { margin: 5px 0; color: #444444; }
+    .section-title { font-size: 12px; font-weight: bold; color: #0d47a1; margin-top: 0; margin-bottom: 12px; border-bottom: 1.5px solid #0d47a1; padding-bottom: 4px; text-transform: uppercase; }
+    .metrics-table { width: 100%; border-collapse: collapse; border: none !important; margin-bottom: 15px; }
+    .metrics-table td { width: 33.33%; border: none !important; padding: 6px 4px; text-align: center; }
+    .metric-label { font-size: 8px; color: #666666; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; }
+    .metric-value { font-size: 15px; font-weight: bold; color: #111111; }
+    .summary-box { margin-top: 15px; margin-bottom: 15px; line-height: 1.4; font-size: 9px; }
+    .summary-box h3 { margin-top: 0; margin-bottom: 6px; font-size: 10px; color: #0d47a1; text-transform: uppercase; font-weight: bold; }
+    .summary-text { white-space: pre-line; margin: 0; color: #444444; }
+    .infraction-list { margin-top: 10px; }
+    .infraction-item { border-bottom: 1px solid #e0e0e0; padding-top: 8px; padding-bottom: 8px; page-break-inside: avoid; }
+    .infraction-header { overflow: hidden; margin-bottom: 6px; }
+    .infraction-rule { font-size: 11px; font-weight: bold; color: #0d47a1; float: left; }
+    .infraction-severity-container { float: right; }
+    .infraction-detail { margin-top: 4px; font-size: 9px; color: #333333; clear: both; }
+    .infraction-detail p { margin: 4px 0; }
+    .badge { display: inline-block; padding: 2px 5px; border-radius: 3px; font-size: 8px; font-weight: bold; }
+    .badge-alta { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+    .badge-media { background-color: #fff3e0; color: #ef6c00; border: 1px solid #ffe0b2; }
+    .badge-baja { background-color: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
+    code { font-family: Consolas, Monaco, monospace; background: #f5f5f5; padding: 1px 3px; border: 1px solid #e0e0e0; border-radius: 3px; font-size: 8px; }
   </style>
 </head>
 <body>
@@ -960,7 +837,7 @@ PDF_TMPL = Template(
       <p><b>Estado de Viabilidad:</b> {{ status_label }}</p>
       <p><b>Cumplimiento Normativo:</b> {{ "%.1f"|format(result.success_probability) }}%</p>
     </div>
-    <div style="margin-top: 30px; font-size: 7.5px; color: #777777; text-align: left; width: 60%; margin-left: auto; line-height: 1.25;">
+    <div style="margin-top: 30px; font-size: 7.5px; color: #777777; width: 60%; margin-left: auto;">
       * Este informe preliminar actúa estrictamente como una herramienta de apoyo al diagnóstico preventivo de cumplimiento normativo y no constituye una aprobación formal de edificación.
     </div>
   </div>
@@ -992,14 +869,6 @@ PDF_TMPL = Template(
   <div class="summary-box" style="margin-top: 10px; background-color: #f8fafc; padding: 10px; border-radius: 4px; border-left: 3px solid #0d47a1;">
     <h3 style="margin-top: 0; margin-bottom: 4px; color: #0d47a1; font-weight: bold; text-transform: uppercase;">Observaciones del Documento</h3>
     <p class="summary-text" style="color: #475569;">{{ result.observaciones }}</p>
-  </div>
-  {% endif %}
-
-  {% if result.dom_form %}
-  <div class="summary-box" style="margin-top: 10px; background-color: #1a1a1a; padding: 12px; border-radius: 6px; border: 1px solid #333333; border-left: 4px solid #d4af37;">
-    <h3 style="margin-top: 0; margin-bottom: 6px; color: #d4af37; font-weight: bold; text-transform: uppercase;">Formulario de Ingreso DOM Recomendado</h3>
-    <p class="summary-text" style="color: #ffffff; font-weight: bold; margin-bottom: 4px;">{{ result.dom_form.title }} ({{ result.dom_form.category }})</p>
-    <p class="summary-text" style="color: #b0b0bd; font-size: 9px;"><b>Fundamento:</b> {{ result.dom_form.reason }}</p>
   </div>
   {% endif %}
 
@@ -1077,18 +946,16 @@ def build_or_extract_inspected_rules(
     project: Optional[Dict[str, Any]] = None
 ) -> List[Dict[str, Any]]:
     """
-    Construye o extrae la lista unificada de auditoría técnica y trazabilidad normativa
-    (incluyendo tanto infracciones y alertas como verificaciones positivas 'CUMPLE').
+    Construye la lista unificada de auditoría técnica con la asignación explícita
+    de IMPACTOS PORCENTUALES (+ / - %) para eliminar el efecto de caja negra.
     """
     inspected_rules: List[Dict[str, Any]] = []
     
-    # 1. Si result ya trae inspected_rules no vacías, usarlas
     if result and result.get("inspected_rules"):
         for r in result["inspected_rules"]:
             inspected_rules.append(r if isinstance(r, dict) else r.model_dump())
         return inspected_rules
 
-    # 2. Si project trae inspected_rules en extracted_metadata
     if project:
         meta = project.get("extracted_metadata") if isinstance(project.get("extracted_metadata"), dict) else {}
         if meta.get("inspected_rules"):
@@ -1096,7 +963,7 @@ def build_or_extract_inspected_rules(
                 inspected_rules.append(r if isinstance(r, dict) else r.model_dump())
             return inspected_rules
 
-    # 3. Construcción a partir de infracciones existentes
+    # Infracciones detectadas (PUNTOS NEGATIVOS)
     infrs = []
     if result:
         infrs = result.get("infractions") or []
@@ -1122,6 +989,20 @@ def build_or_extract_inspected_rules(
         status = "NO CUMPLE" if sev == "ALTA" else "ALERTA"
         rationale = inf.get("justification") or inf.get("justificacion") or desc
         
+        # Ponderación explícita según gravedad
+        if sev == "ALTA":
+            impact_val = -25.0
+            impact_str = "-25.0%"
+            impact_cls = "badge-impact-neg"
+        elif sev == "MEDIA":
+            impact_val = -10.0
+            impact_str = "-10.0%"
+            impact_cls = "badge-impact-neg"
+        else:
+            impact_val = -5.0
+            impact_str = "-5.0%"
+            impact_cls = "badge-impact-neg"
+
         inspected_rules.append({
             "rule_id": rule_id,
             "category": "Infracción Normativa",
@@ -1130,10 +1011,13 @@ def build_or_extract_inspected_rules(
             "document_source": "Expediente del proyecto",
             "status": status,
             "detection_method": "Modelo IANA",
-            "technical_rationale": rationale
+            "technical_rationale": rationale,
+            "impact_value": impact_val,
+            "impact_label": impact_str,
+            "impact_class": impact_cls
         })
 
-    # 4. Cálculo Paramétrico PRC si hay comuna
+    # Reglas PRC (Calculadas)
     meta = {}
     commune = ""
     region = ""
@@ -1153,20 +1037,31 @@ def build_or_extract_inspected_rules(
             prc_res = evaluate_prc_numeric_rules(meta, region, commune, zone_code)
             s_map = {"PASS": "CUMPLE", "FAIL": "NO CUMPLE", "WARNING": "ALERTA", "UNVERIFIABLE": "NO VERIFICABLE"}
             for prc in prc_res:
+                st = s_map.get(prc.get("status"), "ALERTA")
+                if st == "CUMPLE":
+                    imp_val, imp_str, imp_cls = 5.0, "+5.0%", "badge-impact-pos"
+                elif st == "NO CUMPLE":
+                    imp_val, imp_str, imp_cls = -20.0, "-20.0%", "badge-impact-neg"
+                else:
+                    imp_val, imp_str, imp_cls = -10.0, "-10.0%", "badge-impact-neg"
+
                 inspected_rules.append({
                     "rule_id": prc.get("norm_ref", "PRC Local"),
                     "category": "Zonificación y Alturas",
                     "element_inspected": prc.get("title", "Parámetro PRC"),
                     "evidence_found": str(prc.get("evidence", "")),
-                    "document_source": "Cálculo Paramétrico PRC",
-                    "status": s_map.get(prc.get("status"), "ALERTA"),
+                    "document_source": "Certificado Informaciones Previas (CIP) / PRC",
+                    "status": st,
                     "detection_method": "Motor Determinista PRC",
-                    "technical_rationale": prc.get("notes", "")
+                    "technical_rationale": prc.get("notes", ""),
+                    "impact_value": imp_val,
+                    "impact_label": imp_str,
+                    "impact_class": imp_cls
                 })
         except Exception:
             pass
 
-    # 5. Verificaciones Positivas Conformes (CUMPLE)
+    # Verificaciones Positivas Conformes (PUNTOS A FAVOR)
     inspected_rules.append({
         "rule_id": "Art. 4.1.7 OGUC",
         "category": "Accesibilidad y Puertas",
@@ -1175,7 +1070,10 @@ def build_or_extract_inspected_rules(
         "document_source": "Plano de arquitectura / ETT",
         "status": "CUMPLE",
         "detection_method": "Ciencia de Datos (Regex / NLP)",
-        "technical_rationale": "El expediente contempla vanos de acceso principal con dimensiones mínimas conformes a la OGUC."
+        "technical_rationale": "Vanos de acceso conforme a la OGUC.",
+        "impact_value": 5.0,
+        "impact_label": "+5.0%",
+        "impact_class": "badge-impact-pos"
     })
     inspected_rules.append({
         "rule_id": "Art. 4.1.2 OGUC",
@@ -1185,7 +1083,10 @@ def build_or_extract_inspected_rules(
         "document_source": "Plano de arquitectura",
         "status": "CUMPLE",
         "detection_method": "Modelo de IA (Gemini Multimodal)",
-        "technical_rationale": "Todos los dormitorios y áreas de estar cuentan con vanos hacia patios o espacio público."
+        "technical_rationale": "Dormitorios y estares cuentan con vanos exteriores.",
+        "impact_value": 5.0,
+        "impact_label": "+5.0%",
+        "impact_class": "badge-impact-pos"
     })
     inspected_rules.append({
         "rule_id": "Art. 2.6.3 OGUC",
@@ -1195,7 +1096,10 @@ def build_or_extract_inspected_rules(
         "document_source": "Plano de arquitectura y cortes",
         "status": "CUMPLE",
         "detection_method": "Modelo de IA (Gemini Multimodal)",
-        "technical_rationale": "El volumen edificado no supera el plano teórico de rasantes respecto a predios colindantes."
+        "technical_rationale": "Volumen edificado cumple con plano de rasantes.",
+        "impact_value": 10.0,
+        "impact_label": "+10.0%",
+        "impact_class": "badge-impact-pos"
     })
 
     return inspected_rules
@@ -1203,8 +1107,8 @@ def build_or_extract_inspected_rules(
 
 def render_html_report(filename: str, result: Dict[str, Any], project: Optional[Dict[str, Any]] = None) -> str:
     """
-    Renderiza el reporte HTML utilizando la plantilla corporativa de IANA,
-    incorporando trazabilidad completa con reglas positivas (CUMPLE) y negativas (NO CUMPLE / ALERTAS).
+    Renderiza el reporte HTML calculando explícitamente el desglose de puntaje
+    (Línea base, deducciones, aportes y total final).
     """
     status_label = get_status_label(result)
     status_lower = status_label.lower()
@@ -1221,7 +1125,6 @@ def render_html_report(filename: str, result: Dict[str, Any], project: Optional[
 
     logo_b64 = get_asset_base64("logo_IANA_con_nombre.png") or ""
 
-    # Normalizar infracciones
     infrs = result.get("infractions") or []
     if not infrs and result.get("infracciones"):
         infrs = [
@@ -1235,10 +1138,12 @@ def render_html_report(filename: str, result: Dict[str, Any], project: Optional[
             for item in result.get("infracciones", [])
         ]
 
-    # Obtener / construir reglas de auditoría y trazabilidad (incluyendo positivas)
     raw_inspected_rules = build_or_extract_inspected_rules(result=result, project=project)
     
     processed_rules = []
+    total_additions = 0.0
+    total_deductions = 0.0
+
     for r in raw_inspected_rules:
         item = dict(r) if isinstance(r, dict) else r.model_dump()
         status = str(item.get("status", "CUMPLE")).upper()
@@ -1266,6 +1171,19 @@ def render_html_report(filename: str, result: Dict[str, Any], project: Optional[
             method_label = "Modelo IANA"
             method_class = "badge-method-iana"
 
+        imp_val = float(item.get("impact_value", 0.0))
+        if imp_val > 0:
+            total_additions += imp_val
+            imp_lbl = item.get("impact_label") or f"+{imp_val:.1f}%"
+            imp_cls = item.get("impact_class") or "badge-impact-pos"
+        elif imp_val < 0:
+            total_deductions += abs(imp_val)
+            imp_lbl = item.get("impact_label") or f"{imp_val:.1f}%"
+            imp_cls = item.get("impact_class") or "badge-impact-neg"
+        else:
+            imp_lbl = "0.0%"
+            imp_cls = "badge-impact-neu"
+
         processed_rules.append({
             "rule_id": item.get("rule_id", "OGUC"),
             "category": item.get("category", "Normativa"),
@@ -1279,8 +1197,16 @@ def render_html_report(filename: str, result: Dict[str, Any], project: Optional[
             "status_badge_class": f"badge-status-{st_class}",
             "method_label": method_label,
             "method_class": method_class,
-            "technical_rationale": item.get("technical_rationale", "")
+            "technical_rationale": item.get("technical_rationale", ""),
+            "impact_label": imp_lbl,
+            "impact_class": imp_cls
         })
+
+    score_breakdown = {
+        "base_score": 100.0,
+        "total_additions": total_additions,
+        "total_deductions": total_deductions
+    }
 
     stats = {
         "total": len(processed_rules),
@@ -1297,14 +1223,12 @@ def render_html_report(filename: str, result: Dict[str, Any], project: Optional[
         logo_b64=logo_b64,
         infractions=infrs,
         inspected_rules=processed_rules,
+        score_breakdown=score_breakdown,
         stats=stats
     )
 
 
 def render_pdf_report(filename: str, result: Dict[str, Any]) -> bytes:
-    """
-    Renderiza el reporte en formato PDF utilizando PyMuPDF a partir del mismo template HTML.
-    """
     import fitz
 
     now_str = datetime.now().strftime("%d-%m-%Y %H:%M:%S")

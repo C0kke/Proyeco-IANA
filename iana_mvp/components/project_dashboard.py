@@ -80,9 +80,8 @@ def get_jobs_history(project_id: str, results_dir: str):
 
 def render_audit_and_traceability_tab(project: dict, docs: list):
     """
-    Renderiza el registro detallado y transparente de auditoría técnica y trazabilidad normativa.
-    Muestra los elementos que CUMPLEN, NO CUMPLEN o son ALERTA, junto con el método de detección
-    (Ciencia de Datos Regex/NLP, Modelo Multimodal Gemini, Motor Paramétrico PRC).
+    Renderiza el registro detallado y transparente de auditoría técnica y trazabilidad normativa,
+    incluyendo la Cadena de Cálculo (Score Breakdown) con aportes y deducciones exactas.
     """
     st.subheader("Auditoría Técnica y Trazabilidad Normativa", anchor=False)
     st.markdown(
@@ -92,6 +91,29 @@ def render_audit_and_traceability_tab(project: dict, docs: list):
     )
     
     inspected_rules = build_or_extract_inspected_rules(project=project)
+
+    # Cálculo de la Cadena de Ponderación (Score Breakdown)
+    total_additions = sum(float(r.get("impact_value", 0.0)) for r in inspected_rules if float(r.get("impact_value", 0.0)) > 0)
+    total_deductions = sum(abs(float(r.get("impact_value", 0.0))) for r in inspected_rules if float(r.get("impact_value", 0.0)) < 0)
+    current_prob = float(project.get("success_probability", 100.0) if project.get("success_probability") is not None else 100.0)
+
+    # Panel de UX: Cadena de Cálculo Matemático
+    st.markdown("### 📊 Cadena de Cálculo y Trazabilidad de Viabilidad")
+    cb1, cb2, cb3, cb4 = st.columns(4)
+    cb1.metric("1. Línea Base Teórica", "100.0%")
+    cb2.metric("2. Aportes Convalidados (+)", f"+{total_additions:.1f}%")
+    cb3.metric("3. Deducciones Aplicadas (-)", f"-{total_deductions:.1f}%", delta_color="inverse")
+    cb4.metric("4. Viabilidad Resultante", f"{current_prob:.1f}%")
+
+    st.info(
+        "💡 **¿Por qué cambia la viabilidad al ingestar nuevos documentos?**\n\n"
+        "Al incorporar documentos normativos como el **Certificado de Informaciones Previas (CIP)**, IANA activa "
+        "automáticamente verificaciones específicas del Plan Regulador Comunal (PRC) y exigencias del predio. "
+        "Si la carpeta aún no incluye las especificaciones o estudios exigidos por la zona descubierta en el CIP "
+        "(ej. superficie predial o medidas de riesgo), el sistema aplica deducciones preventivas hasta que sean subsanadas."
+    )
+
+    st.divider()
 
     # Estadísticas
     total_count = len(inspected_rules)
@@ -136,7 +158,7 @@ def render_audit_and_traceability_tab(project: dict, docs: list):
     elif method_filter == "Plan Regulador Comunal":
         filtered = [r for r in filtered if "PRC" in r.get("detection_method", "") or "Determinista" in r.get("detection_method", "")]
 
-    # Paginación progresiva (10 en 10)
+    # Paginación progresiva
     page_key = f"audit_page_limit_{project['id']}"
     if page_key not in st.session_state:
         st.session_state[page_key] = 10
@@ -169,6 +191,14 @@ def render_audit_and_traceability_tab(project: dict, docs: list):
             else:
                 method_badge = '<span style="background-color: #581c87; color: #d8b4fe; font-weight: 600; padding: 2px 7px; border-radius: 4px; font-size: 10px;">Modelo IANA</span>'
 
+            imp_val = float(item.get("impact_value", 0.0))
+            if imp_val > 0:
+                impact_badge = f'<span style="background-color: #064e3b; color: #34d399; border: 1px solid #059669; font-family: monospace; font-weight: 700; padding: 2px 7px; border-radius: 4px; font-size: 10px;">{item.get("impact_label", f"+{imp_val:.1f}%")}</span>'
+            elif imp_val < 0:
+                impact_badge = f'<span style="background-color: #450a0a; color: #f87171; border: 1px solid #dc2626; font-family: monospace; font-weight: 700; padding: 2px 7px; border-radius: 4px; font-size: 10px;">{item.get("impact_label", f"{imp_val:.1f}%")}</span>'
+            else:
+                impact_badge = '<span style="background-color: #27272a; color: #a1a1aa; border: 1px solid #3f3f46; font-family: monospace; font-weight: 700; padding: 2px 7px; border-radius: 4px; font-size: 10px;">0.0%</span>'
+
             st.markdown(
                 f"""
                 <div style="background-color: #18181b; border: 1px solid #27272a; border-left: 4px solid {border_color}; border-radius: 8px; padding: 14px; margin-bottom: 10px;">
@@ -178,6 +208,7 @@ def render_audit_and_traceability_tab(project: dict, docs: list):
                             <span style="color: #a1a1aa; font-size: 12px; margin-left: 8px;">({item.get('rule_id')})</span>
                         </div>
                         <div style="display: flex; gap: 6px; align-items: center;">
+                            {impact_badge}
                             {method_badge}
                             {status_badge}
                         </div>
@@ -199,11 +230,9 @@ def render_audit_and_traceability_tab(project: dict, docs: list):
             st.session_state[page_key] += 10
             st.rerun()
 
-
 def render_dom_forms_section(project_metadata: dict, context_text: str = "", ai_recommendation_id: Optional[str] = None, job_id_suffix: str = "main"):
     """
-    Renderiza la sección de Formulario de Ingreso DOM con los colores oficiales de la plataforma (#D4AF37, #1A1A1A, #333333, #B0B0BD).
-    Permanece siempre activa y disponible en las vistas del proyecto.
+    Renderiza la sección de Formulario de Ingreso DOM con los colores oficiales de la plataforma.
     """
     st.subheader("Formulario de Ingreso a la DOM Recomendado", anchor=False)
     
@@ -458,9 +487,7 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
         
     if missing_docs:
         missing_str = ", ".join(missing_docs)
-        st.warning(
-            f"Falta subir los siguientes documentos para este proyecto: {missing_str}."
-        )
+        st.warning(f"Falta subir los siguientes documentos para este proyecto: {missing_str}.")
         
     st.write("")
     
@@ -495,27 +522,28 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
         if docs_list:
             st.markdown("**Documentos integrados en la memoria y contexto del proyecto:**")
             badges_html = '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;">'
+            
+            doc_labels_map = {
+                "cip": "CIP",
+                "ett": "ETT",
+                "site_plan": "Emplazamiento",
+                "sections": "Arquitectura",
+                "elevations": "Elevaciones",
+                "cuts": "Cortes",
+                "techumbre": "Techumbre",
+                "other": "Otro"
+            }
+            
             for d in docs_list:
                 dtype = d.get("document_type")
                 fname = d.get("file_name", "")
-                if fname.startswith("[Techumbre] "):
-                    fname = fname[len("[Techumbre] "):]
-                    dtype_label = "Techumbre"
-                elif fname.startswith("[Otro] "):
-                    fname = fname[len("[Otro] "):]
-                    dtype_label = "Otro"
-                else:
-                    labels = {
-                        "cip": "CIP",
-                        "ett": "ETT",
-                        "site_plan": "Emplazamiento",
-                        "sections": "Arquitectura",
-                        "elevations": "Elevaciones",
-                        "cuts": "Cortes",
-                        "other": "Otro"
-                    }
-                    dtype_label = labels.get(dtype, dtype)
                 
+                # Limpieza de prefijos heredados
+                for prefix in ["[Techumbre] ", "[Otro] ", "[Cortes] "]:
+                    if fname.startswith(prefix):
+                        fname = fname[len(prefix):]
+                
+                dtype_label = doc_labels_map.get(dtype, dtype)
                 badges_html += f'<span style="background-color: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">📄 {fname} <small style="color: #64748b; font-weight: 400;">({dtype_label})</small></span>'
             badges_html += '</div>'
             st.markdown(badges_html, unsafe_allow_html=True)
@@ -529,6 +557,7 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
             "incluyendo este y los documentos previamente cargados."
         )
         
+        # Mapeo idéntico al del selector de la UI
         doc_type = st.selectbox(
             "Tipo de Documento a Subir",
             options=["cip", "ett", "site_plan", "sections", "elevations", "cuts", "techumbre", "other"],
@@ -591,10 +620,9 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
             duplicate_doc = None
             for d in docs_list:
                 clean_db_name = d.get("file_name", "")
-                if clean_db_name.startswith("[Techumbre] "):
-                    clean_db_name = clean_db_name[len("[Techumbre] "):]
-                elif clean_db_name.startswith("[Otro] "):
-                    clean_db_name = clean_db_name[len("[Otro] "):]
+                for prefix in ["[Techumbre] ", "[Otro] ", "[Cortes] "]:
+                    if clean_db_name.startswith(prefix):
+                        clean_db_name = clean_db_name[len(prefix):]
                 
                 if is_duplicate_or_copy_name(uploaded_file.name, clean_db_name):
                     duplicate_doc = clean_db_name
@@ -647,13 +675,9 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                         )
                         
                     with st.spinner("Guardando documento en el almacenamiento..."):
+                        # Todos los tipos de documento se guardan de forma nativa en la DB
                         db_doc_type = doc_type
                         display_filename = uploaded_file.name
-                        if doc_type == "techumbre":
-                            db_doc_type = "other"
-                            display_filename = f"[Techumbre] {uploaded_file.name}"
-                        elif doc_type == "other":
-                            display_filename = f"[Otro] {uploaded_file.name}"
                         
                         from app.db import upload_project_document
                         db_res = upload_project_document(
@@ -818,12 +842,6 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
         def get_display_label(doc):
             dtype = doc.get("document_type")
             fname = doc.get("file_name", "")
-            if dtype == "other":
-                if fname.startswith("[Techumbre]"):
-                    return "Techumbre"
-                elif fname.startswith("[Otro]"):
-                    return "Otro documento"
-                return "Otro documento"
             
             labels = {
                 "cip": "Certificado de Informaciones Previas (CIP)",
@@ -831,7 +849,9 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                 "site_plan": "Plano de emplazamiento",
                 "sections": "Plano de arquitectura",
                 "elevations": "Plano de elevaciones",
-                "cuts": "Plano de cortes"
+                "cuts": "Plano de cortes",
+                "techumbre": "Techumbre",
+                "other": "Otro documento"
             }
             return labels.get(dtype, dtype)
             
@@ -854,10 +874,9 @@ def render_project_dashboard(oguc_content: str, uploads_dir: str, results_dir: s
                 col_d1, col_d2, col_d3, col_d4 = st.columns([3, 2, 1, 1])
                 with col_d1:
                     display_name = d.get('file_name', '')
-                    if display_name.startswith("[Techumbre] "):
-                        display_name = display_name[len("[Techumbre] "):]
-                    elif display_name.startswith("[Otro] "):
-                        display_name = display_name[len("[Otro] "):]
+                    for prefix in ["[Techumbre] ", "[Otro] ", "[Cortes] "]:
+                        if display_name.startswith(prefix):
+                            display_name = display_name[len(prefix):]
                     st.markdown(f"**{display_name}**")
                     st.caption(f"Subido el {dt_str}")
                 with col_d2:
